@@ -20,7 +20,7 @@ struct RewardsView: View {
                         VStack(spacing: 8) {
                             Image(systemName: "star.circle.fill")
                                 .font(.system(size: 48))
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Brand.gold)
                             Text("You're on the list, \(savedName.split(separator: " ").first.map(String.init) ?? savedName)!")
                                 .font(.headline)
                             Text("We'll text you the truck location every week plus exclusive deals.")

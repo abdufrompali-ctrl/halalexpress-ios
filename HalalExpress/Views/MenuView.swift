@@ -32,6 +32,12 @@ struct MenuView: View {
     @ViewBuilder
     private func menuList(_ catalog: Catalog) -> some View {
         List {
+            Section {
+                BrandHeader()
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+            }
+
             if let hours, !hours.orderingOpen {
                 Section {
                     Label(hours.message ?? "Online ordering is closed right now — you can still order ahead at checkout.",
@@ -50,12 +56,16 @@ struct MenuView: View {
             ForEach(catalog.categories, id: \.self) { category in
                 let items = catalog.items.filter { $0.category == category }
                 if !items.isEmpty {
-                    Section(category.capitalized) {
+                    Section {
                         ForEach(items) { item in
                             NavigationLink(value: item) {
                                 MenuRow(item: item)
                             }
                         }
+                    } header: {
+                        Text(category)
+                            .font(.subheadline.weight(.heavy))
+                            .foregroundStyle(Brand.red)
                     }
                 }
             }
@@ -78,6 +88,31 @@ struct MenuView: View {
     }
 }
 
+struct BrandHeader: View {
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "truck.box.fill")
+                .font(.system(size: 34))
+                .foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("HALAL EXPRESS")
+                    .font(.title3.weight(.black))
+                    .foregroundStyle(.white)
+                Text("Authentic halal, made fresh on the truck")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            Spacer()
+        }
+        .padding(18)
+        .background(
+            LinearGradient(colors: [Brand.ember, Brand.red, Brand.redDeep],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+}
+
 struct MenuRow: View {
     let item: CatalogItem
 
@@ -87,8 +122,8 @@ struct MenuRow: View {
                 Text(item.name).font(.headline)
                 Spacer()
                 Text(String(format: "$%.2f", item.price))
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(Brand.ember)
             }
             if !item.desc.isEmpty {
                 Text(item.desc)

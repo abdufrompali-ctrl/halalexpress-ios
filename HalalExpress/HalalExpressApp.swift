@@ -8,7 +8,7 @@ struct HalalExpressApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(cart)
-                .tint(.orange)
+                .tint(Brand.red)
         }
     }
 }

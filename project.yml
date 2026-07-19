@@ -1,0 +1,23 @@
+name: HalalExpress
+options:
+  bundleIdPrefix: com.halalexpress
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  HalalExpress:
+    type: application
+    platform: iOS
+    sources: [HalalExpress]
+    info:
+      path: HalalExpress/Info.plist
+      properties:
+        CFBundleDisplayName: Halal Express
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.halalexpress.app
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        TARGETED_DEVICE_FAMILY: 1
+        SWIFT_VERSION: 5.9

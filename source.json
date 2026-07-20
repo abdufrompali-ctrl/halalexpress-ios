@@ -17,11 +17,11 @@
       "versions": [
         {
           "version": "1.5.0",
-          "buildVersion": "11",
+          "buildVersion": "12",
           "date": "2026-07-20",
-          "localizedDescription": "Automated build 11 (325c0ed819073c0648f908f32539b56f024e9368).",
-          "downloadURL": "https://github.com/abdufrompali-ctrl/halalexpress-ios/releases/download/v1.5.0-b11/HalalExpress.ipa",
-          "size": 454270,
+          "localizedDescription": "Automated build 12 (b81dab0c64b8cd24402096ade7bd1921abfc7536).",
+          "downloadURL": "https://github.com/abdufrompali-ctrl/halalexpress-ios/releases/download/v1.5.0-b12/HalalExpress.ipa",
+          "size": 474337,
           "minOSVersion": "17.0"
         }
       ]

@@ -27,11 +27,22 @@ struct CartView: View {
                             row("Service Fee (3%)", cart.feeCents)
                             row("Total", cart.totalCents, bold: true)
                         }
-
-                        Section {
-                            NavigationLink("Checkout") { CheckoutView() }
-                                .font(.headline)
+                    }
+                    .listStyle(.insetGrouped)
+                    .safeAreaInset(edge: .bottom) {
+                        NavigationLink {
+                            CheckoutView()
+                        } label: {
+                            HStack {
+                                Text("Checkout")
+                                Spacer()
+                                Text(dollars(cart.totalCents)).monospacedDigit()
+                            }
                         }
+                        .buttonStyle(BrandButtonStyle())
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
+                        .background(.ultraThinMaterial)
                     }
                 }
             }
@@ -44,8 +55,9 @@ struct CartView: View {
             Text(label)
             Spacer()
             Text(dollars(cents)).monospacedDigit()
+                .foregroundStyle(bold ? Brand.red : .primary)
         }
-        .fontWeight(bold ? .semibold : .regular)
+        .fontWeight(bold ? .bold : .regular)
     }
 }
 

@@ -11,19 +11,23 @@ struct MenuView: View {
                 if let catalog {
                     menuList(catalog)
                 } else if let error {
-                    ContentUnavailableView("Menu unavailable",
-                                           systemImage: "wifi.exclamationmark",
-                                           description: Text(error))
-                        .overlay(alignment: .bottom) {
-                            Button("Retry") { Task { await load() } }
-                                .buttonStyle(.borderedProminent)
-                                .padding(.bottom, 40)
-                        }
+                    ContentUnavailableView {
+                        Label("Menu unavailable", systemImage: "wifi.exclamationmark")
+                    } description: {
+                        Text(error)
+                    } actions: {
+                        Button("Retry") { Task { await load() } }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Brand.red)
+                    }
                 } else {
                     ProgressView("Loading menu…")
+                        .controlSize(.large)
+                        .tint(Brand.red)
                 }
             }
             .navigationTitle("Halal Express")
+            .navigationBarTitleDisplayMode(.inline)
             .task { await load() }
             .refreshable { await load() }
         }
@@ -34,23 +38,16 @@ struct MenuView: View {
         List {
             Section {
                 BrandHeader()
-                    .listRowInsets(EdgeInsets())
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
                     .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
 
-            if let hours, !hours.orderingOpen {
-                Section {
-                    Label(hours.message ?? "Online ordering is closed right now — you can still order ahead at checkout.",
-                          systemImage: "clock.badge.exclamationmark")
-                        .font(.subheadline)
-                        .foregroundStyle(.orange)
-                }
-            } else if let loc = hours?.location {
-                Section {
-                    Label("Open now — \(loc.display)", systemImage: "mappin.and.ellipse")
-                        .font(.subheadline)
-                        .foregroundStyle(.green)
-                }
+            Section {
+                HoursBanner(hours: hours)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
 
             ForEach(catalog.categories, id: \.self) { category in
@@ -63,13 +60,15 @@ struct MenuView: View {
                             }
                         }
                     } header: {
-                        Text(category)
+                        Label(category, systemImage: Brand.icon(for: category))
                             .font(.subheadline.weight(.heavy))
                             .foregroundStyle(Brand.red)
+                            .textCase(nil)
                     }
                 }
             }
         }
+        .listStyle(.insetGrouped)
         .navigationDestination(for: CatalogItem.self) { item in
             ItemDetailView(item: item)
         }
@@ -92,24 +91,55 @@ struct BrandHeader: View {
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: "truck.box.fill")
-                .font(.system(size: 34))
+                .font(.system(size: 36))
                 .foregroundStyle(.white)
-            VStack(alignment: .leading, spacing: 2) {
+                .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+            VStack(alignment: .leading, spacing: 3) {
                 Text("HALAL EXPRESS")
-                    .font(.title3.weight(.black))
+                    .font(.title2.weight(.black))
                     .foregroundStyle(.white)
+                    .kerning(0.5)
                 Text("Authentic halal, made fresh on the truck")
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(.white.opacity(0.9))
             }
             Spacer()
         }
-        .padding(18)
-        .background(
-            LinearGradient(colors: [Brand.ember, Brand.red, Brand.redDeep],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(LinearGradient.brand)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .shadow(color: Brand.red.opacity(0.3), radius: 12, y: 6)
+    }
+}
+
+/// Open/closed status pill fed by /api/hours.
+struct HoursBanner: View {
+    let hours: HoursStatus?
+
+    var body: some View {
+        if let hours {
+            let open = hours.orderingOpen
+            HStack(spacing: 10) {
+                Image(systemName: open ? "checkmark.seal.fill" : "clock.badge.exclamationmark.fill")
+                    .foregroundStyle(open ? .green : Brand.ember)
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(open ? "Open now" : "Ordering closed")
+                        .font(.subheadline.weight(.semibold))
+                    Text(open
+                         ? (hours.location?.display ?? "Tap an item to start your order")
+                         : (hours.message ?? "You can still order ahead at checkout."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                Spacer()
+            }
+            .padding(12)
+            .background((open ? Color.green : Brand.ember).opacity(0.10),
+                        in: RoundedRectangle(cornerRadius: 12))
+        }
     }
 }
 
@@ -117,21 +147,25 @@ struct MenuRow: View {
     let item: CatalogItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(item.name).font(.headline)
-                Spacer()
-                Text(String(format: "$%.2f", item.price))
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(Brand.ember)
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.name)
+                    .font(.headline)
+                if !item.desc.isEmpty {
+                    Text(item.desc)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                if item.options != nil || item.customize != nil {
+                    Text("Customizable")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Brand.ember)
+                }
             }
-            if !item.desc.isEmpty {
-                Text(item.desc)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
+            Spacer(minLength: 8)
+            PricePill(cents: Int((item.price * 100).rounded()))
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 }

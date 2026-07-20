@@ -57,11 +57,11 @@ struct RewardsView: View {
                             Task { await join() }
                         } label: {
                             HStack {
-                                if busy { ProgressView().padding(.trailing, 4) }
-                                Text("Join Free").frame(maxWidth: .infinity).fontWeight(.semibold)
+                                if busy { ProgressView().tint(.white).padding(.trailing, 4) }
+                                Text("Join Free")
                             }
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(BrandButtonStyle(enabled: !busy && phone.filter(\.isNumber).count >= 10))
                         .disabled(busy || phone.filter(\.isNumber).count < 10)
                     }
                     .listRowBackground(Color.clear)

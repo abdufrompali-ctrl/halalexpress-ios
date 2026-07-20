@@ -76,23 +76,29 @@ struct CheckoutView: View {
                 Section { Text(errorMessage).foregroundStyle(.red) }
             }
 
-            Section {
-                Button {
-                    Task { await submit() }
-                } label: {
-                    HStack {
-                        if submitting { ProgressView().padding(.trailing, 4) }
-                        Text("Pay \(dollars(chargeCents))")
-                            .frame(maxWidth: .infinity)
-                            .fontWeight(.semibold)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!formValid || submitting)
-            }
-            .listRowBackground(Color.clear)
         }
         .navigationTitle("Checkout")
+        .safeAreaInset(edge: .bottom) {
+            Button {
+                Task { await submit() }
+            } label: {
+                HStack {
+                    if submitting {
+                        ProgressView().tint(.white).padding(.trailing, 4)
+                    } else {
+                        Image(systemName: "lock.fill")
+                    }
+                    Text("Pay")
+                    Spacer()
+                    Text(dollars(chargeCents)).monospacedDigit()
+                }
+            }
+            .buttonStyle(BrandButtonStyle(enabled: formValid && !submitting))
+            .disabled(!formValid || submitting)
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+            .background(.ultraThinMaterial)
+        }
         .task { await loadOptions() }
         .navigationDestination(item: $confirmation) { conf in
             OrderConfirmationView(confirmation: conf)

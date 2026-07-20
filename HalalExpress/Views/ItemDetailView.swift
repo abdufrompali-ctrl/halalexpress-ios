@@ -9,14 +9,26 @@ struct ItemDetailView: View {
     @State private var selections: [String: Bool] = [:]   // modifier id -> on/off
     @State private var quantity = 1
 
+    private var totalCents: Int { Int((item.price * 100).rounded()) * quantity }
+    private var canAdd: Bool { item.options == nil || selectedOption != nil }
+
     var body: some View {
         Form {
             Section {
-                if !item.desc.isEmpty {
-                    Text(item.desc).font(.subheadline).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    Image(systemName: Brand.icon(for: item.category))
+                        .font(.system(size: 30))
+                        .foregroundStyle(.white)
+                        .frame(width: 60, height: 60)
+                        .background(LinearGradient.brand, in: RoundedRectangle(cornerRadius: 14))
+                    Text(item.name).font(.title2.bold())
+                    if !item.desc.isEmpty {
+                        Text(item.desc).font(.subheadline).foregroundStyle(.secondary)
+                    }
                 }
-                LabeledContent("Price", value: String(format: "$%.2f", item.price))
+                .padding(.vertical, 4)
             }
+            .listRowBackground(Color.clear)
 
             if let options = item.options {
                 Section("Choice") {
@@ -33,26 +45,38 @@ struct ItemDetailView: View {
             modifierSection("Extras", item.customize?.extras)
 
             Section {
-                Stepper("Quantity: \(quantity)", value: $quantity, in: 1...20)
+                Stepper {
+                    HStack {
+                        Text("Quantity")
+                        Spacer()
+                        Text("\(quantity)").font(.body.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(Brand.red)
+                    }
+                } onIncrement: { if quantity < 20 { quantity += 1 } }
+                  onDecrement: { if quantity > 1 { quantity -= 1 } }
             }
-
-            Section {
-                Button {
-                    cart.add(item, option: selectedOption,
-                             customizations: customizationSummary(), quantity: quantity)
-                    dismiss()
-                } label: {
-                    Text("Add to Cart — \(dollars(Int((item.price * 100).rounded()) * quantity))")
-                        .frame(maxWidth: .infinity)
-                        .fontWeight(.semibold)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(item.options != nil && selectedOption == nil)
-            }
-            .listRowBackground(Color.clear)
         }
         .navigationTitle(item.name)
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom) {
+            Button {
+                cart.add(item, option: selectedOption,
+                         customizations: customizationSummary(), quantity: quantity)
+                dismiss()
+            } label: {
+                HStack {
+                    Image(systemName: "cart.badge.plus")
+                    Text("Add to Cart")
+                    Spacer()
+                    Text(dollars(totalCents)).monospacedDigit()
+                }
+            }
+            .buttonStyle(BrandButtonStyle(enabled: canAdd))
+            .disabled(!canAdd)
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+            .background(.ultraThinMaterial)
+        }
         .onAppear {
             if selections.isEmpty, let c = item.customize {
                 for mod in (c.toppings ?? []) + (c.sauces ?? []) + (c.extras ?? []) {
@@ -72,6 +96,7 @@ struct ItemDetailView: View {
                         get: { selections[mod.id] ?? mod.isChecked },
                         set: { selections[mod.id] = $0 }
                     ))
+                    .tint(Brand.red)
                 }
             }
         }

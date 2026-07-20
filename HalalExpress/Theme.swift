@@ -10,6 +10,21 @@ enum Brand {
     static let emberSoft = Color(hex: 0xFF6A4D)
     static let gold      = Color(hex: 0xE2AA53)
     static let ink       = Color(hex: 0x0E0E0E)
+    static let darkBody  = Color(hex: 0x111010)
+    static let darkCard  = Color(hex: 0x1C1A1A)
+}
+
+struct DiagonalSlash: Shape {
+    var rise: CGFloat = 56
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: 0, y: 0))
+        p.addLine(to: CGPoint(x: rect.maxX, y: 0))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - rise))
+        p.addLine(to: CGPoint(x: 0, y: rect.maxY))
+        p.closeSubpath()
+        return p
+    }
 }
 
 extension Color {

@@ -2,7 +2,6 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
-/// Chipotle-style home: greeting, Order Now CTA, truck status + map, recents, rewards.
 struct HomeView: View {
     var switchTab: (AppTab) -> Void
 
@@ -22,48 +21,88 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    greeting
-                    orderNowCard
-                    truckCard
-                    if let last = orders.orders.first {
-                        recentOrderCard(last)
+            ZStack {
+                Brand.darkBody.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 0) {
+                        heroSlash
+                        VStack(alignment: .leading, spacing: 14) {
+                            orderNowCard
+                            truckCard
+                            if let last = orders.orders.first {
+                                recentOrderCard(last)
+                            }
+                            rewardsCard
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, -28)
+                        .padding(.bottom, 24)
                     }
-                    rewardsCard
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 24)
+                .scrollContentBackground(.hidden)
             }
-            .background(Color(.systemGroupedBackground))
             .navigationTitle("Halal Express")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Brand.red, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .task { await load() }
             .refreshable { await load() }
         }
     }
 
-    // MARK: - Cards
+    // MARK: - Hero
 
-    private var greeting: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(firstName.map { "Salaam, \($0) 👋" } ?? "Salaam 👋")
-                .font(.title.bold())
-            Text(daypartLine)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+    private var heroSlash: some View {
+        ZStack(alignment: .topLeading) {
+            LinearGradient(
+                colors: [Brand.ember, Brand.red, Color(hex: 0x6B0808)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            VStack(alignment: .leading, spacing: 8) {
+                if hours?.orderingOpen == true {
+                    liveBadge
+                }
+                Text(firstName.map { "Hey, \($0)" } ?? "Hey there")
+                    .font(.system(size: 30, weight: .heavy))
+                    .foregroundStyle(.white)
+                Text(daypartLine)
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.65))
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 56)
         }
-        .padding(.top, 8)
+        .clipShape(DiagonalSlash(rise: 60))
+    }
+
+    private var liveBadge: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(Color(hex: 0x4ADE80))
+                .frame(width: 6, height: 6)
+                .shadow(color: Color(hex: 0x22C55E), radius: 4)
+            Text("TRUCK IS LIVE")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color(hex: 0x4ADE80))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 5)
+        .background(.black.opacity(0.25), in: Capsule())
     }
 
     private var daypartLine: String {
         let h = Calendar.current.component(.hour, from: Date())
         switch h {
-        case ..<11: return "Good morning — the grill fires up soon."
+        case ..<11: return "The grill fires up soon."
         case ..<16: return "Perfect time for a fresh platter."
         default:    return "Dinner's calling — fresh off the grill."
         }
     }
+
+    // MARK: - Cards
 
     private var orderNowCard: some View {
         Button {
@@ -71,30 +110,39 @@ struct HomeView: View {
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: "truck.box.fill")
-                    .font(.system(size: 34))
+                    .font(.system(size: 32))
+                    .foregroundStyle(Brand.red)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Order Now")
                         .font(.title3.weight(.black))
+                        .foregroundStyle(Brand.ink)
                     Text("Fresh halal, made to order")
                         .font(.caption)
-                        .opacity(0.9)
+                        .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: "chevron.right").font(.headline)
+                Text("Go")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(LinearGradient.brand, in: RoundedRectangle(cornerRadius: 10))
+                    .shadow(color: Brand.red.opacity(0.4), radius: 8, y: 4)
             }
-            .foregroundStyle(.white)
-            .padding(20)
+            .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(LinearGradient.brand)
+            .background(.white)
             .clipShape(RoundedRectangle(cornerRadius: 18))
-            .shadow(color: Brand.red.opacity(0.3), radius: 12, y: 6)
+            .shadow(color: .black.opacity(0.45), radius: 20, y: 8)
         }
         .buttonStyle(.plain)
     }
 
     private var truckCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("The Truck").font(.headline)
+            Text("The Truck")
+                .font(.headline)
+                .foregroundStyle(.white)
 
             HoursBanner(hours: hours)
 
@@ -113,12 +161,11 @@ struct HomeView: View {
             if let next = nextShiftLine {
                 Label(next, systemImage: "calendar")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.35))
             }
         }
         .padding(14)
-        .background(Color(.secondarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 18))
+        .background(Brand.darkCard, in: RoundedRectangle(cornerRadius: 18))
     }
 
     private var nextShiftLine: String? {
@@ -135,23 +182,23 @@ struct HomeView: View {
                 HStack {
                     Label("Last Order", systemImage: "clock.arrow.circlepath")
                         .font(.headline)
+                        .foregroundStyle(.white)
                     Spacer()
                     Text(dollars(order.totalCents))
                         .font(.subheadline.weight(.bold).monospacedDigit())
-                        .foregroundStyle(Brand.red)
+                        .foregroundStyle(Brand.emberSoft)
                 }
                 Text(order.summary)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.5))
                     .lineLimit(2)
                 Text(order.date, format: .dateTime.month().day().hour().minute())
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.white.opacity(0.25))
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground),
-                        in: RoundedRectangle(cornerRadius: 18))
+            .background(Brand.darkCard, in: RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
     }
@@ -168,26 +215,31 @@ struct HomeView: View {
                     if savedPhone.isEmpty {
                         Text("Join Rewards — free")
                             .font(.headline)
+                            .foregroundStyle(Brand.gold)
                         Text("Weekly truck spots + exclusive deals by text")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Brand.gold.opacity(0.5))
                     } else {
                         Text("You're on the list\(firstName.map { ", \($0)" } ?? "")!")
                             .font(.headline)
+                            .foregroundStyle(Brand.gold)
                         Text("Watch your texts for deals and truck spots")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Brand.gold.opacity(0.5))
                     }
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.subheadline)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Brand.gold.opacity(0.35))
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground),
-                        in: RoundedRectangle(cornerRadius: 18))
+            .background(Brand.gold.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(Brand.gold.opacity(0.2), lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
     }
@@ -198,7 +250,6 @@ struct HomeView: View {
         hours = try? await APIClient.shared.hours()
         shifts = (try? await APIClient.shared.scheduleSlots())?.shifts ?? []
 
-        // Geocode today's spot once per address; hide the map quietly on failure.
         let loc = hours?.location ?? shifts.first?.location
         guard let loc else { return }
         let addr = [loc.address, loc.city].compactMap { $0 }.joined(separator: ", ")

@@ -117,6 +117,19 @@ jobs:
           git commit -m "chore: publish v${{ steps.meta.outputs.version }} build ${{ steps.meta.outputs.build }} to source [skip ci]" || exit 0
           git push
 
+      - name: Deploy source.json to VPS
+        env:
+          VPS_DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+        run: |
+          echo "$VPS_DEPLOY_KEY" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+          scp -i /tmp/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            source.json \
+            admin@10.0.0.1:/home/admin/docker/nginx/static/source.json
+          rm /tmp/deploy_key
+
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:

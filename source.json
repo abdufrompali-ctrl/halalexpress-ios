@@ -16,12 +16,12 @@
       "category": "food",
       "versions": [
         {
-          "version": "1.2.0",
-          "buildVersion": "8",
+          "version": "1.3.0",
+          "buildVersion": "9",
           "date": "2026-07-20",
-          "localizedDescription": "Automated build 8 (fbed823b32354ff65d5c3434c86245fff7b744c7).",
-          "downloadURL": "https://github.com/abdufrompali-ctrl/halalexpress-ios/releases/download/v1.2.0-b8/HalalExpress.ipa",
-          "size": 277926,
+          "localizedDescription": "Automated build 9 (e9044fcc004b6b7f29506225e18e75e62ee220a8).",
+          "downloadURL": "https://github.com/abdufrompali-ctrl/halalexpress-ios/releases/download/v1.3.0-b9/HalalExpress.ipa",
+          "size": 288375,
           "minOSVersion": "17.0"
         }
       ]

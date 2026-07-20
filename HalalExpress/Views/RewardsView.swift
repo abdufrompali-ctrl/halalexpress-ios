@@ -1,8 +1,10 @@
 import SwiftUI
 
 struct RewardsView: View {
+    @EnvironmentObject private var orders: OrderHistoryStore
     @AppStorage("loyaltyPhone") private var savedPhone = ""
     @AppStorage("loyaltyName") private var savedName = ""
+    @AppStorage("loyaltyEmail") private var savedEmail = ""
 
     @State private var name = ""
     @State private var phone = ""
@@ -33,9 +35,30 @@ struct RewardsView: View {
                     }
                     .listRowBackground(Color.clear)
 
+                    if !orders.orders.isEmpty {
+                        Section("Recent Orders") {
+                            ForEach(orders.orders.prefix(10)) { order in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack {
+                                        Text(order.date, format: .dateTime.month().day().hour().minute())
+                                            .font(.subheadline.weight(.semibold))
+                                        Spacer()
+                                        Text(dollars(order.totalCents))
+                                            .font(.subheadline.monospacedDigit())
+                                            .foregroundStyle(Brand.red)
+                                    }
+                                    Text(order.summary)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        }
+                    }
+
                     Section {
                         Button("Not you? Sign out", role: .destructive) {
-                            savedPhone = ""; savedName = ""
+                            savedPhone = ""; savedName = ""; savedEmail = ""
                         }
                     }
                 } else {
@@ -81,6 +104,7 @@ struct RewardsView: View {
                 name: name, phone: digits, email: email.isEmpty ? nil : email)
             savedPhone = digits
             savedName = name.isEmpty ? "Guest" : name
+            savedEmail = email.trimmingCharacters(in: .whitespaces).lowercased()
         } catch {
             message = error.localizedDescription
         }

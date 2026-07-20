@@ -2,6 +2,11 @@ import SwiftUI
 
 struct CheckoutView: View {
     @EnvironmentObject private var cart: CartStore
+    @EnvironmentObject private var orders: OrderHistoryStore
+
+    @AppStorage("loyaltyName")  private var savedName = ""
+    @AppStorage("loyaltyPhone") private var savedPhone = ""
+    @AppStorage("loyaltyEmail") private var savedEmail = ""
 
     @State private var name = ""
     @State private var phone = ""
@@ -106,6 +111,11 @@ struct CheckoutView: View {
     }
 
     private func loadOptions() async {
+        // Prefill from the saved Rewards profile so returning customers breeze through.
+        if name.isEmpty { name = savedName }
+        if phone.isEmpty { phone = savedPhone }
+        if email.isEmpty { email = savedEmail }
+
         hours = try? await APIClient.shared.hours()
         shifts = (try? await APIClient.shared.scheduleSlots())?.shifts ?? []
         // If ordering is closed right now, default to the first order-ahead slot
@@ -136,6 +146,14 @@ struct CheckoutView: View {
                 scheduledPickupAt: scheduledSlot
             )
             let resp = try await APIClient.shared.checkout(req)
+            // Log the order locally (powers the reorder list) before clearing the cart.
+            let lines = cart.lines.map {
+                OrderLine(itemId: $0.item.id, name: $0.item.name,
+                          option: $0.option, customizations: $0.customizations,
+                          quantity: $0.quantity)
+            }
+            orders.add(OrderRecord(id: resp.orderId, date: Date(),
+                                   lines: lines, totalCents: Int((resp.total * 100).rounded())))
             cart.clear()
             confirmation = resp
         } catch {

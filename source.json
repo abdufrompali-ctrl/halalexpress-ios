@@ -1,0 +1,29 @@
+{
+  "name": "Halal Express",
+  "identifier": "com.halalexpress.source",
+  "subtitle": "Halal Express — official app source",
+  "iconURL": "https://halalexpressnc.com/icon-512.png",
+  "website": "https://halalexpressnc.com",
+  "apps": [
+    {
+      "name": "Halal Express",
+      "bundleIdentifier": "com.halalexpress.app",
+      "developerName": "Halal Express",
+      "subtitle": "Order authentic halal from the truck",
+      "localizedDescription": "Browse the menu, customize your order, and pay for pickup — straight from the Halal Express food truck.",
+      "iconURL": "https://halalexpressnc.com/icon-512.png",
+      "tintColor": "CC1111",
+      "category": "food",
+      "versions": [
+        {
+          "version": "0.1.0",
+          "date": "2026-07-19",
+          "localizedDescription": "Branding pass: app icon, brand colors, hero header.",
+          "downloadURL": "https://github.com/abdufrompali-ctrl/halalexpress-ios/releases/download/v0.1.0-branding/HalalExpress.ipa",
+          "size": 237379,
+          "minOSVersion": "17.0"
+        }
+      ]
+    }
+  ]
+}

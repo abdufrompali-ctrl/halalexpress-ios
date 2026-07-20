@@ -8,6 +8,7 @@ struct ItemDetailView: View {
     @State private var selectedOption: String?
     @State private var selections: [String: Bool] = [:]   // modifier id -> on/off
     @State private var quantity = 1
+    @State private var addedTrigger = false
 
     private var totalCents: Int { Int((item.price * 100).rounded()) * quantity }
     private var canAdd: Bool { item.options == nil || selectedOption != nil }
@@ -15,18 +16,22 @@ struct ItemDetailView: View {
     var body: some View {
         Form {
             Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Image(systemName: Brand.icon(for: item.category))
-                        .font(.system(size: 30))
-                        .foregroundStyle(.white)
-                        .frame(width: 60, height: 60)
-                        .background(LinearGradient.brand, in: RoundedRectangle(cornerRadius: 14))
+                MenuItemImage(item: item, corner: 16, iconSize: 56)
+                    .frame(height: 190)
+                    .frame(maxWidth: .infinity)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
+
+            Section {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(item.name).font(.title2.bold())
                     if !item.desc.isEmpty {
                         Text(item.desc).font(.subheadline).foregroundStyle(.secondary)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 2)
             }
             .listRowBackground(Color.clear)
 
@@ -62,6 +67,7 @@ struct ItemDetailView: View {
             Button {
                 cart.add(item, option: selectedOption,
                          customizations: customizationSummary(), quantity: quantity)
+                addedTrigger.toggle()
                 dismiss()
             } label: {
                 HStack {
@@ -77,6 +83,7 @@ struct ItemDetailView: View {
             .padding(.bottom, 8)
             .background(.ultraThinMaterial)
         }
+        .sensoryFeedback(.success, trigger: addedTrigger)
         .onAppear {
             if selections.isEmpty, let c = item.customize {
                 for mod in (c.toppings ?? []) + (c.sauces ?? []) + (c.extras ?? []) {

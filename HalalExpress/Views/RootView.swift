@@ -15,5 +15,6 @@ struct RootView: View {
             RewardsView()
                 .tabItem { Label("Rewards", systemImage: "star") }
         }
+        .animation(.snappy, value: cart.itemCount)
     }
 }

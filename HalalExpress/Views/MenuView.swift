@@ -147,7 +147,10 @@ struct MenuRow: View {
     let item: CatalogItem
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
+            MenuItemImage(item: item)
+                .frame(width: 72, height: 72)
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
                     .font(.headline)
@@ -157,14 +160,16 @@ struct MenuRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
-                if item.options != nil || item.customize != nil {
-                    Text("Customizable")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(Brand.ember)
+                HStack(spacing: 8) {
+                    PricePill(cents: Int((item.price * 100).rounded()))
+                    if item.options != nil || item.customize != nil {
+                        Text("Customizable")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Brand.ember)
+                    }
                 }
             }
-            Spacer(minLength: 8)
-            PricePill(cents: Int((item.price * 100).rounded()))
+            Spacer(minLength: 4)
         }
         .padding(.vertical, 4)
     }

@@ -18,6 +18,7 @@ struct CatalogItem: Decodable, Identifiable, Hashable {
     let desc: String
     let options: [String]?     // variation names when the item has real choices
     let customize: CustomizeGroups?
+    let imageURL: URL?         // Square catalog photo; nil until the API serves it
 }
 
 struct CustomizeGroups: Decodable, Hashable {

@@ -69,6 +69,38 @@ struct BrandButtonStyle: ButtonStyle {
     }
 }
 
+/// Item photo with a branded gradient+icon placeholder. Shows the real Square
+/// photo once `item.imageURL` exists; until then the placeholder looks intentional.
+/// Caller sets the frame.
+struct MenuItemImage: View {
+    let item: CatalogItem
+    var corner: CGFloat = 14
+    var iconSize: CGFloat = 28
+
+    var body: some View {
+        ZStack {
+            LinearGradient.brand
+            if let url = item.imageURL {
+                AsyncImage(url: url) { img in
+                    img.resizable().scaledToFill()
+                } placeholder: {
+                    icon
+                }
+            } else {
+                icon
+            }
+        }
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: corner))
+    }
+
+    private var icon: some View {
+        Image(systemName: Brand.icon(for: item.category))
+            .font(.system(size: iconSize))
+            .foregroundStyle(.white.opacity(0.9))
+    }
+}
+
 /// Rounded price chip used on menu rows.
 struct PricePill: View {
     let cents: Int

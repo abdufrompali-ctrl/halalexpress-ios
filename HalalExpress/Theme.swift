@@ -101,6 +101,23 @@ struct MenuItemImage: View {
     }
 }
 
+/// Format a server slot (JS toISOString(), includes fractional seconds) as "6:45 PM".
+func slotTimeLabel(_ iso: String) -> String {
+    let withFrac = ISO8601DateFormatter()
+    withFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    guard let date = withFrac.date(from: iso) ?? ISO8601DateFormatter().date(from: iso) else {
+        return iso
+    }
+    return date.formatted(date: .omitted, time: .shortened)
+}
+
+/// Parse a server slot ISO string into a Date (fractional-seconds tolerant).
+func slotDate(_ iso: String) -> Date? {
+    let withFrac = ISO8601DateFormatter()
+    withFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return withFrac.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
+}
+
 /// Rounded price chip used on menu rows.
 struct PricePill: View {
     let cents: Int

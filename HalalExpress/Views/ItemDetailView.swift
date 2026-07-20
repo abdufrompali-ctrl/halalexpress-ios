@@ -5,10 +5,28 @@ struct ItemDetailView: View {
     @EnvironmentObject private var cart: CartStore
     @Environment(\.dismiss) private var dismiss
 
+    private enum Step: Hashable {
+        case choice, toppings, sauces, extras, review
+    }
+
     @State private var selectedOption: String?
     @State private var selections: [String: Bool] = [:]   // modifier id -> on/off
     @State private var quantity = 1
+    @State private var stepIndex = 0
     @State private var addedTrigger = false
+
+    // Steps are derived from what the item actually offers; Review is always last.
+    private var steps: [Step] {
+        var s: [Step] = []
+        if item.options != nil { s.append(.choice) }
+        if !(item.customize?.toppings ?? []).isEmpty { s.append(.toppings) }
+        if !(item.customize?.sauces ?? []).isEmpty { s.append(.sauces) }
+        if !(item.customize?.extras ?? []).isEmpty { s.append(.extras) }
+        s.append(.review)
+        return s
+    }
+    private var isBuilder: Bool { steps.count > 1 }
+    private var currentStep: Step { steps[min(stepIndex, steps.count - 1)] }
 
     private var totalCents: Int { Int((item.price * 100).rounded()) * quantity }
     private var canAdd: Bool { item.options == nil || selectedOption != nil }
@@ -16,49 +34,50 @@ struct ItemDetailView: View {
     var body: some View {
         Form {
             Section {
-                MenuItemImage(item: item, corner: 16, iconSize: 56)
-                    .frame(height: 190)
+                MenuItemImage(item: item, corner: 16, iconSize: 48)
+                    .frame(height: isBuilder ? 140 : 190)
                     .frame(maxWidth: .infinity)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             }
 
-            Section {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(item.name).font(.title2.bold())
-                    if !item.desc.isEmpty {
-                        Text(item.desc).font(.subheadline).foregroundStyle(.secondary)
-                    }
+            if isBuilder {
+                Section {
+                    stepHeader
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
-                .padding(.vertical, 2)
-            }
-            .listRowBackground(Color.clear)
 
-            if let options = item.options {
-                Section("Choice") {
-                    Picker("Option", selection: $selectedOption) {
-                        ForEach(options, id: \.self) { Text($0).tag(Optional($0)) }
-                    }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                }
-            }
+                stepContent
 
-            modifierSection("Toppings", item.customize?.toppings)
-            modifierSection("Sauces", item.customize?.sauces)
-            modifierSection("Extras", item.customize?.extras)
-
-            Section {
-                Stepper {
+                Section {
                     HStack {
-                        Text("Quantity")
+                        if stepIndex > 0 {
+                            Button {
+                                withAnimation(.snappy) { stepIndex -= 1 }
+                            } label: {
+                                Label("Back", systemImage: "chevron.left")
+                            }
+                            .buttonStyle(.borderless)
+                        }
                         Spacer()
-                        Text("\(quantity)").font(.body.weight(.semibold).monospacedDigit())
-                            .foregroundStyle(Brand.red)
+                        if stepIndex < steps.count - 1 {
+                            Button {
+                                withAnimation(.snappy) { stepIndex += 1 }
+                            } label: {
+                                Label("Next", systemImage: "chevron.right")
+                                    .labelStyle(.titleAndIcon)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Brand.red)
+                            .disabled(currentStep == .choice && selectedOption == nil)
+                        }
                     }
-                } onIncrement: { if quantity < 20 { quantity += 1 } }
-                  onDecrement: { if quantity > 1 { quantity -= 1 } }
+                    .listRowBackground(Color.clear)
+                }
+            } else {
+                simpleContent
             }
         }
         .navigationTitle(item.name)
@@ -91,6 +110,108 @@ struct ItemDetailView: View {
                 }
             }
             if selectedOption == nil { selectedOption = item.options?.first }
+        }
+    }
+
+    // MARK: - Builder steps
+
+    private var stepHeader: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 6) {
+                ForEach(steps.indices, id: \.self) { i in
+                    Capsule()
+                        .fill(i <= stepIndex ? Brand.red : Color.gray.opacity(0.25))
+                        .frame(height: 5)
+                }
+            }
+            HStack {
+                Text(stepTitle(currentStep))
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Brand.red)
+                Spacer()
+                Text("Step \(stepIndex + 1) of \(steps.count)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func stepTitle(_ step: Step) -> String {
+        switch step {
+        case .choice:   return "Make It Yours"
+        case .toppings: return "Pick Your Toppings"
+        case .sauces:   return "Sauce It Up"
+        case .extras:   return "Any Extras?"
+        case .review:   return "Review Your \(item.name)"
+        }
+    }
+
+    @ViewBuilder
+    private var stepContent: some View {
+        switch currentStep {
+        case .choice:
+            if let options = item.options {
+                Section("Choice") {
+                    Picker("Option", selection: $selectedOption) {
+                        ForEach(options, id: \.self) { Text($0).tag(Optional($0)) }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                }
+            }
+        case .toppings:
+            modifierSection("Toppings", item.customize?.toppings)
+        case .sauces:
+            modifierSection("Sauces", item.customize?.sauces)
+        case .extras:
+            modifierSection("Extras", item.customize?.extras)
+        case .review:
+            Section("Your Order") {
+                if let selectedOption {
+                    LabeledContent("Choice", value: selectedOption)
+                }
+                LabeledContent("Customizations",
+                               value: customizationSummary() ?? "As served")
+                Stepper {
+                    HStack {
+                        Text("Quantity")
+                        Spacer()
+                        Text("\(quantity)")
+                            .font(.body.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(Brand.red)
+                    }
+                } onIncrement: { if quantity < 20 { quantity += 1 } }
+                  onDecrement: { if quantity > 1 { quantity -= 1 } }
+            }
+        }
+    }
+
+    // MARK: - Simple (non-customizable) layout
+
+    @ViewBuilder
+    private var simpleContent: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(item.name).font(.title2.bold())
+                if !item.desc.isEmpty {
+                    Text(item.desc).font(.subheadline).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .listRowBackground(Color.clear)
+
+        Section {
+            Stepper {
+                HStack {
+                    Text("Quantity")
+                    Spacer()
+                    Text("\(quantity)")
+                        .font(.body.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(Brand.red)
+                }
+            } onIncrement: { if quantity < 20 { quantity += 1 } }
+              onDecrement: { if quantity > 1 { quantity -= 1 } }
         }
     }
 

@@ -14,12 +14,13 @@ targets:
         CFBundleDisplayName: Halal Express
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.halalexpress.app
-        MARKETING_VERSION: 1.2.0
+        MARKETING_VERSION: 1.3.0
         CURRENT_PROJECT_VERSION: 1
         TARGETED_DEVICE_FAMILY: 1
         SWIFT_VERSION: 5.9

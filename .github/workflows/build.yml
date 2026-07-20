@@ -3,7 +3,13 @@ name: Build iOS app
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'source.json'   # avoid a loop when CI commits the catalog back
+      - 'README.md'
   workflow_dispatch:
+
+permissions:
+  contents: write        # create releases + push the updated source.json
 
 jobs:
   build:
@@ -17,13 +23,14 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build (unsigned, for sideloading)
+      - name: Build (unsigned; build number = run number)
         run: |
           xcodebuild -project HalalExpress.xcodeproj \
             -scheme HalalExpress \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= \
             build
 
@@ -31,10 +38,86 @@ jobs:
         run: |
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/HalalExpress.app Payload/
-          zip -qry HalalExpress-unsigned.ipa Payload
+          zip -qry HalalExpress.ipa Payload
+
+      - name: Read version metadata from the built app
+        id: meta
+        run: |
+          PLIST=Payload/HalalExpress.app/Info.plist
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$PLIST")
+          BUILD=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$PLIST")
+          SIZE=$(stat -f%z HalalExpress.ipa)
+          TAG="v${VERSION}-b${BUILD}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD"     >> "$GITHUB_OUTPUT"
+          echo "size=$SIZE"       >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
+          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.meta.outputs.tag }}" HalalExpress.ipa \
+            --title "Halal Express ${{ steps.meta.outputs.version }} (build ${{ steps.meta.outputs.build }})" \
+            --notes "Automated build from ${{ github.sha }}." \
+            --target "${{ github.sha }}"
+
+      - name: Regenerate SideStore source catalog
+        env:
+          REPO: ${{ github.repository }}
+          V:    ${{ steps.meta.outputs.version }}
+          B:    ${{ steps.meta.outputs.build }}
+          SIZE: ${{ steps.meta.outputs.size }}
+          TAG:  ${{ steps.meta.outputs.tag }}
+          DATE: ${{ steps.meta.outputs.date }}
+          SHA:  ${{ github.sha }}
+        run: |
+          DL="https://github.com/${REPO}/releases/download/${TAG}/HalalExpress.ipa"
+          cat > source.json <<JSON
+          {
+            "name": "Halal Express",
+            "identifier": "com.halalexpress.source",
+            "subtitle": "Halal Express — official app source",
+            "iconURL": "https://halalexpressnc.com/icon-512.png",
+            "website": "https://halalexpressnc.com",
+            "apps": [
+              {
+                "name": "Halal Express",
+                "bundleIdentifier": "com.halalexpress.app",
+                "developerName": "Halal Express",
+                "subtitle": "Order authentic halal from the truck",
+                "localizedDescription": "Browse the menu, customize your order, and pay for pickup — straight from the Halal Express food truck.",
+                "iconURL": "https://halalexpressnc.com/icon-512.png",
+                "tintColor": "CC1111",
+                "category": "food",
+                "versions": [
+                  {
+                    "version": "${V}",
+                    "buildVersion": "${B}",
+                    "date": "${DATE}",
+                    "localizedDescription": "Automated build ${B} (${SHA}).",
+                    "downloadURL": "${DL}",
+                    "size": ${SIZE},
+                    "minOSVersion": "17.0"
+                  }
+                ]
+              }
+            ]
+          }
+          JSON
+          python3 -c "import json;json.load(open('source.json'));print('source.json valid')"
+
+      - name: Commit updated catalog
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add source.json
+          git commit -m "chore: publish v${{ steps.meta.outputs.version }} build ${{ steps.meta.outputs.build }} to source [skip ci]" || exit 0
+          git push
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: HalalExpress-unsigned-ipa
-          path: HalalExpress-unsigned.ipa
+          path: HalalExpress.ipa

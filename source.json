@@ -16,7 +16,8 @@
       "category": "food",
       "versions": [
         {
-          "version": "0.1.0",
+          "version": "1.0",
+          "buildVersion": "1",
           "date": "2026-07-19",
           "localizedDescription": "Branding pass: app icon, brand colors, hero header.",
           "downloadURL": "https://github.com/abdufrompali-ctrl/halalexpress-ios/releases/download/v0.1.0-branding/HalalExpress.ipa",

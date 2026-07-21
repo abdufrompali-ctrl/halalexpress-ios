@@ -56,20 +56,61 @@ struct RewardsView: View {
                 colors: [Brand.ember, Brand.red, Color(hex: 0x6B0808)],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             )
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 6) {
+                    Image(systemName: "gift.fill").font(.caption2.weight(.bold))
+                    Text("FREE TO JOIN").font(.caption2.weight(.heavy)).kerning(1.5)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(.black.opacity(0.22), in: Capsule())
+
                 Text("Deals. Drops.\nFirst Dibs.")
-                    .font(.system(size: 32, weight: .heavy))
+                    .font(.display(56))
                     .foregroundStyle(.white)
-                    .lineSpacing(2)
-                Text("Join free — get exclusive coupons,\nweekly truck spots, and member-only deals by text.")
+
+                Text("Unlock exclusive coupons, weekly truck spots, and member-only drops — texted straight to you.")
                     .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.75))
+                    .foregroundStyle(.white.opacity(0.85))
+
+                HStack(spacing: 6) {
+                    Image(systemName: "bolt.fill").font(.caption2)
+                    Text("Where the regulars find out first")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(.white.opacity(0.9))
             }
             .padding(.horizontal, 20)
             .padding(.top, 24)
-            .padding(.bottom, 56)
+            .padding(.bottom, 62)
         }
         .clipShape(DiagonalSlash(rise: 50))
+    }
+
+    /// Spotlight card at the top of the sign-up flow — leads with the payoff.
+    private var welcomePerk: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle().fill(Brand.ember.opacity(0.15)).frame(width: 52, height: 52)
+                Image(systemName: "gift.fill").font(.title3).foregroundStyle(Brand.ember)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Unlock this week's deals")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                Text("New coupons and truck drops every week — always free.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.55))
+            }
+            Spacer()
+        }
+        .padding(16)
+        .glassCard(cornerRadius: 16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(Brand.ember.opacity(0.28), lineWidth: 1)
+        )
+        .padding(.horizontal, 20)
     }
 
     private var memberHero: some View {
@@ -192,6 +233,8 @@ struct RewardsView: View {
 
     private var signUpForm: some View {
         VStack(spacing: 16) {
+            welcomePerk
+
             // FOMO deal previews
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Member Deals — Unlock Free")
@@ -403,7 +446,7 @@ private struct InputRow: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
-                .background(Color(hex: 0x222020))
+                .background(.ultraThinMaterial)
                 .submitLabel(isLast ? .done : .next)
                 .onSubmit { focused = isLast ? nil : nextField }
             if !isLast {

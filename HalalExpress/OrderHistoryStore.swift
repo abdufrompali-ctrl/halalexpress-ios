@@ -32,6 +32,11 @@ final class OrderHistoryStore: ObservableObject {
         save()
     }
 
+    func clear() {
+        orders.removeAll()
+        UserDefaults.standard.removeObject(forKey: key)
+    }
+
     private func load() {
         guard let data = UserDefaults.standard.data(forKey: key),
               let decoded = try? JSONDecoder().decode([OrderRecord].self, from: data)

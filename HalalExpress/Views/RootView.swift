@@ -1,6 +1,10 @@
 import SwiftUI
 
+enum AppTab: Hashable { case home, order, rewards, settings }
+
 struct RootView: View {
+    @State private var tab: AppTab = .home
+
     init() {
         // Warm, on-brand tab bar (ember selected, warm charcoal background).
         let a = UITabBarAppearance()
@@ -20,18 +24,22 @@ struct RootView: View {
     }
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
+            HomeView(goOrder: { tab = .order })
+                .tabItem { Label("Home", systemImage: "house.fill") }
+                .tag(AppTab.home)
+
             OrderView()
                 .tabItem { Label("Order", systemImage: "bag.fill") }
-
-            LocateView()
-                .tabItem { Label("Locate", systemImage: "mappin.and.ellipse") }
-
-            MenuView()
-                .tabItem { Label("Menu", systemImage: "fork.knife") }
+                .tag(AppTab.order)
 
             RewardsView()
                 .tabItem { Label("Rewards", systemImage: "star.fill") }
+                .tag(AppTab.rewards)
+
+            SettingsView()
+                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                .tag(AppTab.settings)
         }
         .tint(Brand.ember)
     }

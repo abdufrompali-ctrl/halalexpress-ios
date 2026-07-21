@@ -220,11 +220,20 @@ struct ItemDetailView: View {
         if let mods, !mods.isEmpty {
             Section(title) {
                 ForEach(mods) { mod in
-                    Toggle(mod.label, isOn: Binding(
-                        get: { selections[mod.id] ?? mod.isChecked },
-                        set: { selections[mod.id] = $0 }
-                    ))
-                    .tint(Brand.red)
+                    let on = selections[mod.id] ?? mod.isChecked
+                    Button {
+                        selections[mod.id] = !on
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                                .font(.title3)
+                                .foregroundStyle(on ? Brand.red : Color.secondary)
+                            Text(mod.label).foregroundStyle(.primary)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }

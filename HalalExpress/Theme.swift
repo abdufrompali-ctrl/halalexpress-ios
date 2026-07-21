@@ -12,6 +12,14 @@ enum Brand {
     static let ink       = Color(hex: 0x0E0E0E)
     static let darkBody  = Color(hex: 0x111010)
     static let darkCard  = Color(hex: 0x1C1A1A)
+
+    // Warm charcoal system (Chipotle-warm, not cold black) + crisp corners.
+    static let warmBg    = Color(hex: 0x12100E)
+    static let warmBg2   = Color(hex: 0x171310)
+    static let warmCard  = Color(hex: 0x1B1613)
+    static let cardBrd   = Color.white.opacity(0.07)
+    static let paper     = Color(hex: 0xF4EFE7)
+    static let r: CGFloat = 3          // tight radius — crisp, not rounded
 }
 
 struct DiagonalSlash: Shape {
@@ -47,6 +55,9 @@ extension Font {
     /// Bundled condensed display face (Bebas Neue) for wordmarks & big titles.
     /// Falls back to the system font automatically if the file fails to register.
     static func display(_ size: CGFloat) -> Font { .custom("BebasNeue-Regular", size: size) }
+
+    /// Monospaced figures for prices & totals — kitchen-ticket authenticity.
+    static func price(_ size: CGFloat) -> Font { .system(size: size, weight: .semibold, design: .monospaced) }
 }
 
 extension Brand {
@@ -196,7 +207,7 @@ struct BrandBackground: View {
 
     var body: some View {
         ZStack {
-            Color(hex: 0x070606)                                    // near-black base
+            Color(hex: 0x0F0C0A)                                    // warm near-black base
 
             // Top crimson bloom
             RadialGradient(colors: [Brand.red.opacity(0.20),

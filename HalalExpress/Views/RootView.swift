@@ -1,32 +1,38 @@
 import SwiftUI
 
-enum AppTab: Hashable {
-    case home, menu, cart, rewards
-}
-
 struct RootView: View {
-    @EnvironmentObject private var cart: CartStore
-    @State private var tab: AppTab = .home
+    init() {
+        // Warm, on-brand tab bar (ember selected, warm charcoal background).
+        let a = UITabBarAppearance()
+        a.configureWithOpaqueBackground()
+        a.backgroundColor = UIColor(Brand.warmBg2)
+        a.shadowColor = UIColor.white.withAlphaComponent(0.06)
+        let sel = UIColor(Brand.emberSoft)
+        let norm = UIColor.white.withAlphaComponent(0.42)
+        for s in [a.stackedLayoutAppearance, a.inlineLayoutAppearance, a.compactInlineLayoutAppearance] {
+            s.selected.iconColor = sel
+            s.selected.titleTextAttributes = [.foregroundColor: sel]
+            s.normal.iconColor = norm
+            s.normal.titleTextAttributes = [.foregroundColor: norm]
+        }
+        UITabBar.appearance().standardAppearance = a
+        UITabBar.appearance().scrollEdgeAppearance = a
+    }
 
     var body: some View {
-        TabView(selection: $tab) {
-            HomeView(switchTab: { tab = $0 })
-                .tabItem { Label("Home", systemImage: "house.fill") }
-                .tag(AppTab.home)
+        TabView {
+            OrderView()
+                .tabItem { Label("Order", systemImage: "bag.fill") }
+
+            LocateView()
+                .tabItem { Label("Locate", systemImage: "mappin.and.ellipse") }
 
             MenuView()
                 .tabItem { Label("Menu", systemImage: "fork.knife") }
-                .tag(AppTab.menu)
-
-            CartView()
-                .tabItem { Label("Cart", systemImage: "cart") }
-                .badge(cart.itemCount > 0 ? "\(cart.itemCount)" : nil)
-                .tag(AppTab.cart)
 
             RewardsView()
-                .tabItem { Label("Rewards", systemImage: "star") }
-                .tag(AppTab.rewards)
+                .tabItem { Label("Rewards", systemImage: "star.fill") }
         }
-        .animation(.snappy, value: cart.itemCount)
+        .tint(Brand.ember)
     }
 }

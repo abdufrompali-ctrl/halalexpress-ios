@@ -18,9 +18,9 @@ struct HomeView: View {
     @State private var camera: MapCameraPosition = .automatic
     @State private var geocoded = ""
 
-    // TODO: replace with the real Halal Express storefront links.
-    private let doorDashURL = URL(string: "https://www.doordash.com")!
-    private let uberEatsURL = URL(string: "https://www.ubereats.com")!
+    // Real Halal Express storefronts — universal links open the app if installed.
+    private let doorDashURL = URL(string: "https://www.doordash.com/en/store/halal-express-wilmington-27459818/92292416/")!
+    private let uberEatsURL = URL(string: "https://www.ubereats.com/store/halal-express-carolina-beach-rd-dba-two-brothers-enterprises-llc/efqybQ5OWrSEbn5TsYV4HA?diningMode=DELIVERY&surfaceName=")!
 
     private var firstName: String? { savedName.split(separator: " ").first.map(String.init) }
     private var isOpen: Bool { hours?.orderingOpen == true }

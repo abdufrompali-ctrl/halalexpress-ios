@@ -17,6 +17,8 @@ targets:
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIAppFonts:
+          - BebasNeue-Regular.ttf
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.halalexpress.app

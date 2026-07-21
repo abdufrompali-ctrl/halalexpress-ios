@@ -43,6 +43,12 @@ extension LinearGradient {
         startPoint: .topLeading, endPoint: .bottomTrailing)
 }
 
+extension Font {
+    /// Bundled condensed display face (Bebas Neue) for wordmarks & big titles.
+    /// Falls back to the system font automatically if the file fails to register.
+    static func display(_ size: CGFloat) -> Font { .custom("BebasNeue-Regular", size: size) }
+}
+
 extension Brand {
     /// SF Symbol per menu category, for a little visual texture on headers.
     static func icon(for category: String) -> String {
@@ -131,6 +137,151 @@ func slotDate(_ iso: String) -> Date? {
     let withFrac = ISO8601DateFormatter()
     withFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     return withFrac.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
+}
+
+// MARK: - App background ("wallpaper")
+
+/// A faint engineering grid used as subtle background texture.
+struct GridPattern: Shape {
+    var spacing: CGFloat = 44
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        var x = rect.minX
+        while x <= rect.maxX {
+            p.move(to: CGPoint(x: x, y: rect.minY))
+            p.addLine(to: CGPoint(x: x, y: rect.maxY))
+            x += spacing
+        }
+        var y = rect.minY
+        while y <= rect.maxY {
+            p.move(to: CGPoint(x: rect.minX, y: y))
+            p.addLine(to: CGPoint(x: rect.maxX, y: y))
+            y += spacing
+        }
+        return p
+    }
+}
+
+/// Deterministic film-grain speckle drawn once with Canvas (no image asset, no
+/// per-frame cost). `.overlay` blend lifts the flat black without banding.
+struct GrainOverlay: View {
+    var intensity: Double = 0.05
+    var body: some View {
+        Canvas { ctx, size in
+            var seed: UInt64 = 0x9E3779B97F4A7C15
+            func rnd() -> Double {                         // xorshift PRNG, fixed seed → stable grain
+                seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17
+                return Double(seed % 100_000) / 100_000.0
+            }
+            let count = Int(size.width * size.height / 480)
+            for _ in 0..<count {
+                let rect = CGRect(x: rnd() * size.width, y: rnd() * size.height,
+                                  width: 1.1, height: 1.1)
+                ctx.fill(Path(rect), with: .color(.white.opacity(rnd() * intensity)))
+            }
+        }
+        .blendMode(.overlay)
+        .allowsHitTesting(false)
+        .ignoresSafeArea()
+    }
+}
+
+/// Abstract black / crimson / ember backdrop that replaces flat fills app-wide.
+/// Mirrors the website hero: near-black base, layered radial ember glows that
+/// slowly breathe & drift, a faint edge-fading grid, and fine film grain.
+struct BrandBackground: View {
+    /// Pass `false` behind heavy scrolling lists to skip the animation.
+    var animated: Bool = true
+    @State private var t = false
+
+    var body: some View {
+        ZStack {
+            Color(hex: 0x070606)                                    // near-black base
+
+            // Top crimson bloom
+            RadialGradient(colors: [Brand.red.opacity(0.20),
+                                    Brand.redDeep.opacity(0.06), .clear],
+                           center: UnitPoint(x: 0.5, y: -0.05),
+                           startRadius: 0, endRadius: 540)
+
+            // Hot ember orb, lower-trailing — breathes & drifts (blurred circle
+            // so offset/scale/opacity tween smoothly; a RadialGradient would snap)
+            Circle()
+                .fill(Brand.ember)
+                .frame(width: 460, height: 460)
+                .blur(radius: 100)
+                .opacity(t ? 0.32 : 0.20)
+                .scaleEffect(t ? 1.10 : 0.95)
+                .offset(x: t ? 150 : 190, y: t ? 300 : 360)
+
+            // Soft warm orb, mid-leading — counter-drifts
+            Circle()
+                .fill(Brand.emberSoft)
+                .frame(width: 340, height: 340)
+                .blur(radius: 90)
+                .opacity(t ? 0.16 : 0.10)
+                .scaleEffect(t ? 1.05 : 0.92)
+                .offset(x: t ? -150 : -120, y: t ? -20 : 40)
+
+            // Faint grid, masked to fade at the edges
+            GridPattern(spacing: 44)
+                .stroke(Color.white.opacity(0.05), lineWidth: 0.6)
+                .mask {
+                    RadialGradient(colors: [.white, .clear],
+                                   center: UnitPoint(x: 0.5, y: 0.34),
+                                   startRadius: 0, endRadius: 480)
+                }
+
+            GrainOverlay()
+        }
+        .ignoresSafeArea()
+        .onAppear {
+            guard animated else { return }
+            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) {
+                t = true
+            }
+        }
+    }
+}
+
+/// Frosted "glass" surface: translucent material + a faint white hairline, so
+/// cards lift off the ember backdrop instead of reading as flat blocks.
+struct GlassCard: ViewModifier {
+    var cornerRadius: CGFloat = 18
+    func body(content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .strokeBorder(Color.white.opacity(0.09), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
+    }
+}
+
+/// Staggered fade-up used to give screens a little life on appear.
+struct AppearFadeUp: ViewModifier {
+    var delay: Double = 0
+    @State private var shown = false
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown ? 0 : 16)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.55).delay(delay)) { shown = true }
+            }
+    }
+}
+
+extension View {
+    /// Frosted glass card surface (see `GlassCard`).
+    func glassCard(cornerRadius: CGFloat = 18) -> some View {
+        modifier(GlassCard(cornerRadius: cornerRadius))
+    }
+    /// Fade + rise in on appear, optionally staggered by `delay`.
+    func appearFadeUp(delay: Double = 0) -> some View {
+        modifier(AppearFadeUp(delay: delay))
+    }
 }
 
 /// Rounded price chip used on menu rows.

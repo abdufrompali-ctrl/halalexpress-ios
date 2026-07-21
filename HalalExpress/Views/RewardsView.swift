@@ -22,7 +22,7 @@ struct RewardsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Brand.darkBody.ignoresSafeArea()
+                BrandBackground()
                 ScrollView {
                     VStack(spacing: 0) {
                         if isMember { memberHero } else { guestHero }
@@ -167,7 +167,7 @@ struct RewardsView: View {
                                 .foregroundStyle(Brand.emberSoft)
                         }
                         .padding(14)
-                        .background(Brand.darkCard, in: RoundedRectangle(cornerRadius: 14))
+                        .glassCard(cornerRadius: 14)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -308,7 +308,7 @@ private struct PerkChip: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(Brand.darkCard, in: RoundedRectangle(cornerRadius: 14))
+        .glassCard(cornerRadius: 14)
     }
 }
 
@@ -342,7 +342,7 @@ private struct DealCard: View {
                 .foregroundStyle(.white.opacity(0.2))
         }
         .padding(14)
-        .background(Brand.darkCard, in: RoundedRectangle(cornerRadius: 16))
+        .glassCard(cornerRadius: 16)
     }
 }
 
@@ -375,10 +375,10 @@ private struct LockedDealCard: View {
                 .foregroundStyle(.white.opacity(0.15))
         }
         .padding(14)
-        .background(Brand.darkCard, in: RoundedRectangle(cornerRadius: 16))
+        .glassCard(cornerRadius: 16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Brand.red.opacity(0.08), lineWidth: 1)
+                .strokeBorder(Brand.red.opacity(0.18), lineWidth: 1)
         )
     }
 }

@@ -22,17 +22,17 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Brand.darkBody.ignoresSafeArea()
+                BrandBackground()
                 ScrollView {
                     VStack(spacing: 0) {
                         heroSlash
                         VStack(alignment: .leading, spacing: 14) {
-                            orderNowCard
-                            truckCard
+                            orderNowCard.appearFadeUp(delay: 0.05)
+                            truckCard.appearFadeUp(delay: 0.12)
                             if let last = orders.orders.first {
-                                recentOrderCard(last)
+                                recentOrderCard(last).appearFadeUp(delay: 0.19)
                             }
-                            rewardsCard
+                            rewardsCard.appearFadeUp(delay: 0.26)
                         }
                         .padding(.horizontal)
                         .padding(.top, -28)
@@ -165,7 +165,7 @@ struct HomeView: View {
             }
         }
         .padding(14)
-        .background(Brand.darkCard, in: RoundedRectangle(cornerRadius: 18))
+        .glassCard()
     }
 
     private var nextShiftLine: String? {
@@ -198,7 +198,7 @@ struct HomeView: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Brand.darkCard, in: RoundedRectangle(cornerRadius: 18))
+            .glassCard()
         }
         .buttonStyle(.plain)
     }

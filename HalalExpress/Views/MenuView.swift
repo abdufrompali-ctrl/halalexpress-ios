@@ -7,7 +7,9 @@ struct MenuView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
+            ZStack {
+                BrandBackground(animated: false)
+                Group {
                 if let catalog {
                     menuList(catalog)
                 } else if let error {
@@ -25,11 +27,15 @@ struct MenuView: View {
                         .controlSize(.large)
                         .tint(Brand.red)
                 }
+                }
+                .navigationTitle("Halal Express")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(Brand.red, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+                .toolbarColorScheme(.dark, for: .navigationBar)
+                .task { await load() }
+                .refreshable { await load() }
             }
-            .navigationTitle("Halal Express")
-            .navigationBarTitleDisplayMode(.inline)
-            .task { await load() }
-            .refreshable { await load() }
         }
     }
 
@@ -69,6 +75,7 @@ struct MenuView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
         .navigationDestination(for: CatalogItem.self) { item in
             ItemDetailView(item: item)
         }
@@ -96,9 +103,9 @@ struct BrandHeader: View {
                 .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
             VStack(alignment: .leading, spacing: 3) {
                 Text("HALAL EXPRESS")
-                    .font(.title2.weight(.black))
+                    .font(.display(32))
                     .foregroundStyle(.white)
-                    .kerning(0.5)
+                    .kerning(1)
                 Text("Authentic halal, made fresh on the truck")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.9))

@@ -18,9 +18,9 @@ struct SplashView: View {
 
                 VStack(spacing: 6) {
                     Text("HALAL EXPRESS")
-                        .font(.largeTitle.weight(.black))
+                        .font(.display(54))
                         .foregroundStyle(.white)
-                        .kerning(1.5)
+                        .kerning(2)
                     Text("Authentic halal, made fresh")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.9))

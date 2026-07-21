@@ -13,7 +13,8 @@ struct RewardsView: View {
     @State private var errorMsg: String?
     @FocusState private var focused: Field?
 
-    private enum Field: Hashable { case name, phone, email }
+    // `fileprivate` (not `private`) so the file-level InputRow struct can reference it.
+    fileprivate enum Field: Hashable { case name, phone, email }
     private var isMember: Bool { !savedPhone.isEmpty }
     private var firstName: String? {
         savedName.split(separator: " ").first.map(String.init)

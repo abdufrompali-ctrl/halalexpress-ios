@@ -6,13 +6,13 @@ struct RootView: View {
     @State private var tab: AppTab = .home
 
     init() {
-        // Warm, on-brand tab bar (ember selected, warm charcoal background).
+        // Paper tab bar: warm off-white, red for the selected tab, a hairline top edge.
         let a = UITabBarAppearance()
         a.configureWithOpaqueBackground()
-        a.backgroundColor = UIColor(Brand.warmBg2)
-        a.shadowColor = UIColor.white.withAlphaComponent(0.06)
-        let sel = UIColor(Brand.emberSoft)
-        let norm = UIColor.white.withAlphaComponent(0.42)
+        a.backgroundColor = UIColor(Paper.bg)
+        a.shadowColor = UIColor(Paper.line)
+        let sel = UIColor(Paper.red)
+        let norm = UIColor(Paper.inkFaint)
         for s in [a.stackedLayoutAppearance, a.inlineLayoutAppearance, a.compactInlineLayoutAppearance] {
             s.selected.iconColor = sel
             s.selected.titleTextAttributes = [.foregroundColor: sel]
@@ -26,21 +26,21 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $tab) {
             HomeView(goOrder: { tab = .order })
-                .tabItem { Label("Home", systemImage: "house.fill") }
+                .tabItem { Label("Home", systemImage: "house") }
                 .tag(AppTab.home)
 
             OrderView()
-                .tabItem { Label("Order", systemImage: "bag.fill") }
+                .tabItem { Label("Menu", systemImage: "list.bullet") }
                 .tag(AppTab.order)
 
             RewardsView()
-                .tabItem { Label("Rewards", systemImage: "star.fill") }
+                .tabItem { Label("Updates", systemImage: "bell") }
                 .tag(AppTab.rewards)
 
             SettingsView()
-                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                .tabItem { Label("Account", systemImage: "person") }
                 .tag(AppTab.settings)
         }
-        .tint(Brand.ember)
+        .tint(Paper.red)
     }
 }

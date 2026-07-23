@@ -4,7 +4,6 @@ import SwiftUI
 struct HalalExpressApp: App {
     @StateObject private var cart = CartStore()
     @StateObject private var orders = OrderHistoryStore()
-    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("onboardingComplete") private var onboardingComplete = false
     @State private var showSplash = true
     @State private var showOnboarding = false
@@ -15,7 +14,7 @@ struct HalalExpressApp: App {
                 RootView()
                     .environmentObject(cart)
                     .environmentObject(orders)
-                    .tint(Brand.red)
+                    .tint(Paper.red)
 
                 if showSplash {
                     SplashView()
@@ -23,29 +22,20 @@ struct HalalExpressApp: App {
                         .zIndex(1)
                 }
             }
+            .preferredColorScheme(.light)   // the design commits to paper — light only
             .fullScreenCover(isPresented: $showOnboarding) {
                 OnboardingView(onDone: { showOnboarding = false })
             }
-            .onAppear(perform: playSplash)
-            .onChange(of: scenePhase) { old, new in
-                // Re-play the splash when the app is reopened from the background.
-                if new == .active && old == .background {
-                    showSplash = true
-                    playSplash()
-                }
-            }
+            .task { await openingSequence() }   // once per launch, not on every foreground
         }
     }
 
-    private func playSplash() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.7) {
-            withAnimation(.easeOut(duration: 0.45)) {
-                showSplash = false
-            }
-            // First open only: greet with the Rewards sign-up (skippable).
-            if !onboardingComplete {
-                showOnboarding = true
-            }
-        }
+    /// Show the wordmark briefly on cold launch, then reveal the app. First run
+    /// only, offer the (skippable) text-list sign-up. Runs once — no stacked timers,
+    /// no replay when returning from the background.
+    private func openingSequence() async {
+        try? await Task.sleep(for: .seconds(1.1))
+        withAnimation(.easeOut(duration: 0.4)) { showSplash = false }
+        if !onboardingComplete { showOnboarding = true }
     }
 }

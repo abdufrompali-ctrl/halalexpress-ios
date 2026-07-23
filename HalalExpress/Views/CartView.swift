@@ -1,63 +1,83 @@
 import SwiftUI
 
 struct CartView: View {
+    var onFinished: () -> Void = {}
+
     @EnvironmentObject private var cart: CartStore
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
-            Group {
+            ZStack {
+                PaperGroundLayer()
                 if cart.isEmpty {
                     ContentUnavailableView("Your cart is empty",
                                            systemImage: "cart",
-                                           description: Text("Add something tasty from the menu."))
+                                           description: Text("Add a dish from the menu to start an order."))
                 } else {
-                    List {
-                        Section {
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            Rule()
                             ForEach(cart.lines) { line in
                                 CartRow(line: line)
+                                Rule().padding(.leading, 20)
                             }
-                            .onDelete { idx in
-                                idx.map { cart.lines[$0] }.forEach { cart.remove($0) }
-                            }
-                        }
-
-                        Section("Order Total") {
-                            row("Subtotal", cart.subtotalCents)
-                            row("Tax (7%)", cart.taxCents)
-                            row("Service Fee (3%)", cart.feeCents)
-                            row("Total", cart.totalCents, bold: true)
+                            totals.padding(.top, 8)
                         }
                     }
-                    .listStyle(.insetGrouped)
-                    .safeAreaInset(edge: .bottom) {
-                        NavigationLink {
-                            CheckoutView()
-                        } label: {
-                            HStack {
-                                Text("Checkout")
-                                Spacer()
-                                Text(dollars(cart.totalCents)).monospacedDigit()
-                            }
-                        }
-                        .buttonStyle(BrandButtonStyle())
-                        .padding(.horizontal)
-                        .padding(.bottom, 8)
-                        .background(.ultraThinMaterial)
-                    }
+                    .scrollContentBackground(.hidden)
+                    .safeAreaInset(edge: .bottom) { checkoutBar }
                 }
             }
-            .navigationTitle("Cart")
+            .navigationTitle("Your Order")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Paper.bg, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }.tint(Paper.red)
+                }
+            }
         }
+    }
+
+    private var totals: some View {
+        VStack(spacing: 8) {
+            row("Subtotal", cart.subtotalCents)
+            row("Tax (7%)", cart.taxCents)
+            row("Service fee (3%)", cart.feeCents)
+            Rule().padding(.vertical, 2)
+            row("Total", cart.totalCents, bold: true)
+        }
+        .padding(.horizontal, 20).padding(.vertical, 14)
+    }
+
+    private var checkoutBar: some View {
+        NavigationLink {
+            CheckoutView(onFinished: onFinished)
+        } label: {
+            HStack {
+                Text("Checkout")
+                Spacer()
+                Text(dollars(cart.totalCents)).font(.price(17))
+            }
+        }
+        .buttonStyle(SignButtonStyle())
+        .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 8)
+        .background(Paper.bg)
+        .overlay(alignment: .top) { Rule() }
     }
 
     private func row(_ label: String, _ cents: Int, bold: Bool = false) -> some View {
         HStack {
             Text(label)
+                .font(bold ? .system(.body, design: .default).weight(.bold) : .subheadline)
+                .foregroundStyle(bold ? Paper.ink : Paper.inkSoft)
             Spacer()
-            Text(dollars(cents)).monospacedDigit()
-                .foregroundStyle(bold ? Brand.red : .primary)
+            Text(dollars(cents))
+                .font(.price(bold ? 17 : 14))
+                .foregroundStyle(bold ? Paper.red : Paper.ink)
         }
-        .fontWeight(bold ? .bold : .regular)
     }
 }
 
@@ -66,21 +86,27 @@ struct CartRow: View {
     let line: CartLine
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(line.displayName).font(.headline)
-                Spacer()
-                Text(dollars(line.lineCents)).monospacedDigit()
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(line.displayName)
+                        .font(.system(.body, design: .default).weight(.semibold))
+                        .foregroundStyle(Paper.ink)
+                    DottedLeader()
+                    Text(dollars(line.lineCents)).font(.price(15)).foregroundStyle(Paper.ink)
+                }
+                if let custom = line.customizations {
+                    Text(custom).font(.footnote).foregroundStyle(Paper.inkSoft)
+                }
+                Stepper(value: Binding(get: { line.quantity },
+                                       set: { cart.setQuantity(line, to: $0) }),
+                        in: 0...20) {
+                    Text("Qty \(line.quantity)").font(.subheadline).foregroundStyle(Paper.inkSoft)
+                }
+                .fixedSize()
+                .padding(.top, 2)
             }
-            if let custom = line.customizations {
-                Text(custom).font(.caption).foregroundStyle(.secondary)
-            }
-            Stepper("Qty: \(line.quantity)", value: Binding(
-                get: { line.quantity },
-                set: { cart.setQuantity(line, to: $0) }
-            ), in: 0...20)
-            .font(.subheadline)
         }
-        .padding(.vertical, 2)
+        .padding(.horizontal, 20).padding(.vertical, 14)
     }
 }

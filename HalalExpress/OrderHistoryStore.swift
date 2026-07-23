@@ -5,7 +5,26 @@ struct OrderLine: Codable, Hashable {
     let name: String
     let option: String?
     let customizations: String?
+    var addOnCents: Int = 0       // paid extras, preserved so reorders re-price correctly
     let quantity: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case itemId, name, option, customizations, addOnCents, quantity
+    }
+    init(itemId: String, name: String, option: String?, customizations: String?,
+         addOnCents: Int = 0, quantity: Int) {
+        self.itemId = itemId; self.name = name; self.option = option
+        self.customizations = customizations; self.addOnCents = addOnCents; self.quantity = quantity
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        itemId = try c.decode(String.self, forKey: .itemId)
+        name = try c.decode(String.self, forKey: .name)
+        option = try c.decodeIfPresent(String.self, forKey: .option)
+        customizations = try c.decodeIfPresent(String.self, forKey: .customizations)
+        addOnCents = (try? c.decode(Int.self, forKey: .addOnCents)) ?? 0
+        quantity = try c.decode(Int.self, forKey: .quantity)
+    }
 }
 
 struct OrderRecord: Codable, Identifiable {

@@ -1,95 +1,101 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @EnvironmentObject private var cart: CartStore
-    @EnvironmentObject private var orders: OrderHistoryStore
     @AppStorage("loyaltyName")  private var name = ""
     @AppStorage("loyaltyPhone") private var phone = ""
     @AppStorage("loyaltyEmail") private var email = ""
-    @AppStorage("notifyDeals")  private var notifyDeals = true
     @AppStorage("defaultTipPct") private var defaultTip = 15
-    @State private var showDelete = false
 
     private var signedIn: Bool { !phone.isEmpty }
+    private let shareURL = URL(string: "https://halalexpressnc.com")!
 
     var body: some View {
         NavigationStack {
             ZStack {
-                BrandBackground(animated: false)
-                List {
-                    Text("Settings").font(.display(46)).foregroundStyle(.white)
-                        .padding(.top, 8).padding(.bottom, 2)
-                        .listRowBackground(Color.clear).listRowSeparator(.hidden)
-
-                    Section("Account") {
+                PaperGroundLayer()
+                VStack(spacing: 0) {
+                    BoardHeader(eyebrow: "HALAL EXPRESS", title: "ACCOUNT")
+                    List {
+                        Section("Your info") {
                         if signedIn {
-                            infoRow("person.fill", "Name", name.isEmpty ? "—" : name)
-                            infoRow("phone.fill", "Phone", phone)
-                            if !email.isEmpty { infoRow("envelope.fill", "Email", email) }
-                            Button { signOut() } label: {
-                                rowLabel("rectangle.portrait.and.arrow.right", "Sign out", tint: Brand.emberSoft)
-                            }
+                            infoRow("Name", name.isEmpty ? "—" : name)
+                            infoRow("Phone", phone)
+                            if !email.isEmpty { infoRow("Email", email) }
                         } else {
-                            Text("Not signed in. Join Rewards to save your info.")
-                                .font(.subheadline).foregroundStyle(.white.opacity(0.6))
+                            Text("Not on the list. Join from the Updates tab to save your info.")
+                                .font(.subheadline).foregroundStyle(Paper.inkSoft)
                         }
                     }
-                    .listRowBackground(Brand.warmCard)
+                    .listRowBackground(Paper.panel)
 
-                    Section("Notifications") {
-                        Toggle(isOn: $notifyDeals) {
-                            rowLabel("bell.fill", "Deals & truck-spot texts")
-                        }.tint(Brand.ember)
+                    Section("The truck") {
+                        NavigationLink {
+                            LocationsView()
+                        } label: {
+                            Text("Hours & locations").foregroundStyle(Paper.ink)
+                        }
                     }
-                    .listRowBackground(Brand.warmCard)
+                    .listRowBackground(Paper.panel)
 
                     Section("Order defaults") {
                         Picker(selection: $defaultTip) {
-                            ForEach([0, 10, 15, 18, 20, 25], id: \.self) { Text("\($0)%").tag($0) }
+                            ForEach([10, 15, 18, 20, 25], id: \.self) { Text("\($0)%").tag($0) }
                         } label: {
-                            rowLabel("percent", "Default tip")
+                            Text("Default tip")
                         }
-                        .pickerStyle(.menu).tint(Brand.emberSoft)
+                        .tint(Paper.red)
                     }
-                    .listRowBackground(Brand.warmCard)
+                    .listRowBackground(Paper.panel)
 
-                    Section("Support") {
-                        linkRow("envelope.fill", "Message us", "mailto:contact@halalexpressnc.com")
-                        linkRow("questionmark.circle.fill", "Help & FAQ", "https://halalexpressnc.com")
+                    Section("Spread the word") {
+                        ShareLink(item: shareURL) {
+                            HStack {
+                                Text("Tell a friend").foregroundStyle(Paper.ink)
+                                Spacer()
+                                Image(systemName: "square.and.arrow.up").font(.subheadline)
+                                    .foregroundStyle(Paper.inkFaint)
+                            }
+                        }
                     }
-                    .listRowBackground(Brand.warmCard)
+                    .listRowBackground(Paper.panel)
+
+                    Section("Help") {
+                        linkRow("Help & FAQ", "https://halalexpressnc.com")
+                    }
+                    .listRowBackground(Paper.panel)
 
                     Section("About") {
-                        infoRow("info.circle.fill", "Version", version)
-                        linkRow("globe", "halalexpressnc.com", "https://halalexpressnc.com")
-                        infoRow("mappin.circle.fill", "Made in", "Winston-Salem, NC")
+                        infoRow("Version", version)
+                        infoRow("Location", "Wilmington, NC")
+                        linkRow("halalexpressnc.com", "https://halalexpressnc.com")
                     }
-                    .listRowBackground(Brand.warmCard)
+                    .listRowBackground(Paper.panel)
 
                     Section("Legal") {
-                        linkRow("hand.raised.fill", "Privacy Policy", "https://halalexpressnc.com/privacy")
-                        linkRow("doc.text.fill", "Terms of Service", "https://halalexpressnc.com/terms")
+                        linkRow("Privacy Policy", "https://halalexpressnc.com/privacy")
+                        linkRow("Terms of Service", "https://halalexpressnc.com/terms")
                     }
-                    .listRowBackground(Brand.warmCard)
+                    .listRowBackground(Paper.panel)
 
-                    Section {
-                        Button(role: .destructive) { showDelete = true } label: {
-                            rowLabel("trash.fill", "Delete account", tint: Brand.red)
+                    // Unsubscribe-style, tucked at the very bottom.
+                    if signedIn {
+                        Section {
+                            Button { signOut() } label: {
+                                Text("Leave the text list")
+                                    .font(.caption).foregroundStyle(Paper.inkFaint)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .listRowBackground(Color.clear)
                         }
                     }
-                    .listRowBackground(Brand.warmCard)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .foregroundStyle(.white)
+                    .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
+                    .foregroundStyle(Paper.ink)
+                    .tint(Paper.red)
+                }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .confirmationDialog("Delete your account?", isPresented: $showDelete, titleVisibility: .visible) {
-                Button("Delete account", role: .destructive) { deleteAccount() }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This removes your saved info and order history from this device.")
-            }
         }
     }
 
@@ -99,39 +105,23 @@ struct SettingsView: View {
         return "\(v) (\(b))"
     }
 
-    private func rowLabel(_ icon: String, _ title: String, tint: Color = .white) -> some View {
-        HStack(spacing: 13) {
-            Image(systemName: icon).font(.system(size: 15))
-                .foregroundStyle(tint == .white ? Brand.emberSoft : tint).frame(width: 24)
-            Text(title).foregroundStyle(tint)
-        }
-    }
-
-    private func infoRow(_ icon: String, _ title: String, _ value: String) -> some View {
-        HStack(spacing: 13) {
-            Image(systemName: icon).font(.system(size: 15)).foregroundStyle(Brand.emberSoft).frame(width: 24)
-            Text(title).foregroundStyle(.white)
+    private func infoRow(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title).foregroundStyle(Paper.ink)
             Spacer()
-            Text(value).foregroundStyle(.white.opacity(0.45))
+            Text(value).foregroundStyle(Paper.inkSoft)
         }
     }
 
-    private func linkRow(_ icon: String, _ title: String, _ url: String) -> some View {
-        Link(destination: URL(string: url)!) {
-            HStack(spacing: 13) {
-                Image(systemName: icon).font(.system(size: 15)).foregroundStyle(Brand.emberSoft).frame(width: 24)
-                Text(title).foregroundStyle(.white)
+    private func linkRow(_ title: String, _ url: String) -> some View {
+        Link(destination: URL(string: url) ?? URL(string: "https://halalexpressnc.com")!) {
+            HStack {
+                Text(title).foregroundStyle(Paper.ink)
                 Spacer()
-                Image(systemName: "arrow.up.right").font(.caption).foregroundStyle(.white.opacity(0.3))
+                Image(systemName: "arrow.up.right").font(.caption).foregroundStyle(Paper.inkFaint)
             }
         }
     }
 
     private func signOut() { name = ""; phone = ""; email = "" }
-
-    private func deleteAccount() {
-        name = ""; phone = ""; email = ""
-        orders.clear()
-        cart.clear()
-    }
 }

@@ -32,8 +32,9 @@ struct Modifier: Decodable, Identifiable, Hashable {
     let label: String
     let isDefault: Bool
     let isChecked: Bool
+    let price: Double          // upcharge in dollars (e.g. Queso 1, Extra Shrimp 3.99); 0 for free
 
-    private enum CodingKeys: String, CodingKey { case id, label, `default`, checked }
+    private enum CodingKeys: String, CodingKey { case id, label, `default`, checked, price }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -41,7 +42,12 @@ struct Modifier: Decodable, Identifiable, Hashable {
         label = try c.decode(String.self, forKey: .label)
         isDefault = (try? c.decode(Bool.self, forKey: .default)) ?? false
         isChecked = (try? c.decode(Bool.self, forKey: .checked)) ?? false
+        price = (try? c.decode(Double.self, forKey: .price)) ?? 0
     }
+
+    var priceCents: Int { Int((price * 100).rounded()) }
+    /// "Queso (+$1.00)" for the picker; plain label when free.
+    var pricedLabel: String { priceCents > 0 ? "\(label) (+\(dollars(priceCents)))" : label }
 }
 
 // MARK: - /api/hours

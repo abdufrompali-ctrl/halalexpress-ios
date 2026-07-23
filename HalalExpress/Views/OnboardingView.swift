@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// First-open sign-up: captures name/phone/email, joins Rewards, or skips.
+/// First-open welcome. Offers the text list, but never blocks the door — "Skip
+/// and start ordering" is right there. Paper, like the rest of the app.
 struct OnboardingView: View {
     var onDone: () -> Void
 
@@ -14,80 +15,80 @@ struct OnboardingView: View {
     @State private var email = ""
     @State private var busy = false
     @State private var error: String?
+    @FocusState private var focused: Bool
 
-    private var canJoin: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty
-            && phone.filter(\.isNumber).count >= 10
-    }
+    private var phoneValid: Bool { phone.filter(\.isNumber).count >= 10 }
 
     var body: some View {
         ZStack {
-            LinearGradient.brand.ignoresSafeArea()
-
+            Paper.bg.ignoresSafeArea()
             ScrollView {
-                VStack(spacing: 22) {
-                    VStack(spacing: 12) {
-                        Image(systemName: "star.circle.fill")
-                            .font(.system(size: 62))
-                            .foregroundStyle(.white)
-                        Text("Join Halal Express Rewards")
-                            .font(.title.bold())
-                            .foregroundStyle(.white)
-                            .multilineTextAlignment(.center)
-                        Text("Truck locations, exclusive deals, and one-tap reorders — free.")
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.9))
-                            .multilineTextAlignment(.center)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("HALAL").font(.board(64)).foregroundStyle(Paper.ink)
+                    Text("EXPRESS").font(.board(64)).foregroundStyle(Paper.red)
+                    Rectangle().fill(Paper.red).frame(width: 120, height: 4).padding(.top, 10)
+
+                    Text("Halal food truck · Wilmington, NC")
+                        .font(.subheadline).foregroundStyle(Paper.inkSoft)
+                        .padding(.top, 14)
+
+                    Text("Join our text list for locations and specials — or skip and go straight to the menu.")
+                        .font(.body).foregroundStyle(Paper.ink)
+                        .padding(.top, 24)
+
+                    VStack(spacing: 0) {
+                        Rule()
+                        field("Name", text: $name, keyboard: .default, content: .name)
+                        Rule()
+                        field("Phone", text: $phone, keyboard: .phonePad, content: .telephoneNumber)
+                        Rule()
                     }
-                    .padding(.top, 44)
+                    .padding(.top, 20)
 
-                    VStack(spacing: 14) {
-                        field("Name", text: $name, icon: "person.fill")
-                        field("Phone", text: $phone, icon: "phone.fill", keyboard: .phonePad)
-                        field("Email (optional)", text: $email, icon: "envelope.fill",
-                              keyboard: .emailAddress, lowercase: true)
-
-                        if let error {
-                            Text(error).font(.caption).foregroundStyle(.white)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-
-                        Button {
-                            Task { await join() }
-                        } label: {
-                            HStack {
-                                if busy { ProgressView().tint(.white) }
-                                Text("Join Free")
-                            }
-                        }
-                        .buttonStyle(BrandButtonStyle(enabled: canJoin && !busy))
-                        .disabled(!canJoin || busy)
+                    if let error {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .font(.caption).foregroundStyle(Paper.red).padding(.top, 10)
                     }
-                    .padding(18)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
 
-                    Button("Skip for now") { finish() }
-                        .font(.footnote)
-                        .foregroundStyle(.white.opacity(0.75))
-                        .padding(.bottom, 20)
+                    Button {
+                        focused = false
+                        Task { await join() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if busy { ProgressView().tint(.white).scaleEffect(0.8) }
+                            Text(busy ? "Joining…" : "Join the list")
+                        }
+                    }
+                    .buttonStyle(SignButtonStyle(enabled: phoneValid && !busy))
+                    .disabled(!phoneValid || busy)
+                    .padding(.top, 20)
+
+                    Button("Skip and start ordering") { finish() }
+                        .font(.system(.subheadline, design: .default).weight(.semibold))
+                        .foregroundStyle(Paper.red)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .padding(.top, 4)
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 28).padding(.top, 60).padding(.bottom, 32)
+            }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer(); Button("Done") { focused = false }.tint(Paper.red)
             }
         }
     }
 
-    private func field(_ placeholder: String, text: Binding<String>, icon: String,
-                       keyboard: UIKeyboardType = .default, lowercase: Bool = false) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon).foregroundStyle(Brand.red).frame(width: 22)
-            TextField(placeholder, text: text)
-                .keyboardType(keyboard)
-                .textInputAutocapitalization(lowercase ? .never : .words)
-                .autocorrectionDisabled(lowercase)
-                .foregroundStyle(.black)
-        }
-        .padding(14)
-        .background(.white, in: RoundedRectangle(cornerRadius: 12))
+    private func field(_ placeholder: String, text: Binding<String>,
+                       keyboard: UIKeyboardType, content: UITextContentType) -> some View {
+        TextField(placeholder, text: text)
+            .keyboardType(keyboard)
+            .textContentType(content)
+            .textInputAutocapitalization(.words)
+            .focused($focused)
+            .font(.body).foregroundStyle(Paper.ink)
+            .padding(.horizontal, 2).padding(.vertical, 14)
     }
 
     private func join() async {

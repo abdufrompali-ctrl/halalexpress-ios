@@ -1,38 +1,32 @@
 import SwiftUI
 
-// Brand palette — mirrors the website's CSS variables (src/index.css):
-// --red #cc1111, --red-deep #8f0a0a, --ember #ff3b1d, --ember-soft #ff6a4d,
-// --yellow #e2aa53, truck ink #0e0e0e.
-enum Brand {
-    static let red       = Color(hex: 0xCC1111)
-    static let redDeep   = Color(hex: 0x8F0A0A)
-    static let ember     = Color(hex: 0xFF3B1D)
-    static let emberSoft = Color(hex: 0xFF6A4D)
-    static let gold      = Color(hex: 0xE2AA53)
-    static let ink       = Color(hex: 0x0E0E0E)
-    static let darkBody  = Color(hex: 0x111010)
-    static let darkCard  = Color(hex: 0x1C1A1A)
+// MARK: - Palette — "butcher paper & board"
+//
+// Ink on warm paper, one signage red, prices set in tabular figures like a
+// receipt. No gradients, no glass, no glow, no floating orbs. The screen is the
+// paper the truck prints on; rules and boxes do the work cards and shadows used to.
 
-    // Warm charcoal system (Chipotle-warm, not cold black) + crisp corners.
-    static let warmBg    = Color(hex: 0x12100E)
-    static let warmBg2   = Color(hex: 0x171310)
-    static let warmCard  = Color(hex: 0x1B1613)
-    static let cardBrd   = Color.white.opacity(0.07)
-    static let paper     = Color(hex: 0xF4EFE7)
-    static let r: CGFloat = 3          // tight radius — crisp, not rounded
-}
+enum Paper {
+    static let bg       = Color(hex: 0xF4EFE7)   // main paper ground
+    static let panel    = Color(hex: 0xEBE1D1)   // inset panel / secondary block
+    static let panelDim = Color(hex: 0xE4D9C6)   // pressed / disabled fill
+    static let ink      = Color(hex: 0x17130F)   // primary text — warm near-black
+    static let inkSoft  = Color(hex: 0x5B5249)   // secondary text
+    static let inkFaint = Color(hex: 0x93887A)   // tertiary / hints
+    static let line     = Color(hex: 0xD5C9B6)   // hairline rules & borders
+    static let lineBold = Color(hex: 0x17130F)   // heavy rule (board headers)
+    static let red      = Color(hex: 0xC81E1E)   // the one accent
+    static let redDeep  = Color(hex: 0x9E1214)   // pressed red
+    static let open     = Color(hex: 0x2F7D31)   // "open" status — the only other hue
+    static let radius: CGFloat = 0               // menu-board square corners
 
-struct DiagonalSlash: Shape {
-    var rise: CGFloat = 56
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        p.move(to: CGPoint(x: 0, y: 0))
-        p.addLine(to: CGPoint(x: rect.maxX, y: 0))
-        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - rise))
-        p.addLine(to: CGPoint(x: 0, y: rect.maxY))
-        p.closeSubpath()
-        return p
-    }
+    // The black menu-board — a chalkboard mounted on the paper. Hero headers sit on
+    // it in "chalk" cream with the one red accent; content stays on the paper below.
+    static let board        = Color(hex: 0x1C1714)   // warm near-black board surface
+    static let boardInk     = Color(hex: 0xF4EFE7)   // chalk text on the board
+    static let boardInkSoft = Color(hex: 0xA89C8A)   // muted chalk (subtitles)
+    static let hatch        = Color(hex: 0xCBBDA5)   // faint diagonal lines on paper
+    static let boardHatch   = Color(hex: 0xF4EFE7)   // chalk hatch on the board (low opacity)
 }
 
 extension Color {
@@ -44,94 +38,273 @@ extension Color {
     }
 }
 
-extension LinearGradient {
-    /// The signature ember→red→deep diagonal used across the brand.
-    static let brand = LinearGradient(
-        colors: [Brand.ember, Brand.red, Brand.redDeep],
-        startPoint: .topLeading, endPoint: .bottomTrailing)
-}
+// MARK: - Type
+//
+// One display face used sparingly (Bebas Neue — the hand-lettered board), system
+// text for everything readable, tabular mono for money. Sizes are anchored to
+// Dynamic Type text styles with `relativeTo:` so type actually scales.
 
 extension Font {
-    /// Bundled condensed display face (Bebas Neue) for wordmarks & big titles.
-    /// Falls back to the system font automatically if the file fails to register.
-    static func display(_ size: CGFloat) -> Font { .custom("BebasNeue-Regular", size: size) }
+    /// Condensed board/wordmark face. Reach for it only on screen titles, category
+    /// headers and the wordmark — never body copy.
+    static func board(_ size: CGFloat, relativeTo style: Font.TextStyle = .largeTitle) -> Font {
+        .custom("BebasNeue-Regular", size: size, relativeTo: style)
+    }
 
-    /// Monospaced figures for prices & totals — kitchen-ticket authenticity.
-    static func price(_ size: CGFloat) -> Font { .system(size: size, weight: .semibold, design: .monospaced) }
+    /// Tabular figures for prices & totals — receipt authenticity, and they line up
+    /// in a column. Proportional letters, monospaced digits.
+    static func price(_ size: CGFloat) -> Font {
+        .system(size: size, weight: .semibold).monospacedDigit()
+    }
 }
 
-extension Brand {
-    /// SF Symbol per menu category, for a little visual texture on headers.
-    static func icon(for category: String) -> String {
-        switch category.uppercased() {
-        case "PLATES": return "fork.knife"
-        case "WRAPS":  return "takeoutbag.and.cup.and.straw.fill"
-        case "LOADED": return "flame.fill"
-        case "SIDES":  return "carrot.fill"
-        case "EXTRAS": return "plus.circle.fill"
-        default:       return "circle.grid.2x2.fill"
+// MARK: - Rules & leaders
+//
+// The vocabulary that replaces cards: a hairline rule, a heavy rule, and the
+// dotted leader that runs a menu row's name out to its price.
+
+struct Rule: View {
+    var color: Color = Paper.line
+    var height: CGFloat = 1
+    var body: some View { Rectangle().fill(color).frame(height: height) }
+}
+
+/// Row of evenly-spaced dots — the "………" between a dish and its price on a
+/// printed menu. Drawn once, cheaply, and it tiles to any width.
+struct DottedLeader: View {
+    var color: Color = Paper.inkFaint
+    var body: some View {
+        Line()
+            .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [1.5, 4]))
+            .foregroundStyle(color)
+            .frame(height: 1)
+            .padding(.bottom, 3)
+    }
+    private struct Line: Shape {
+        func path(in r: CGRect) -> Path {
+            var p = Path(); p.move(to: CGPoint(x: 0, y: r.midY))
+            p.addLine(to: CGPoint(x: r.maxX, y: r.midY)); return p
         }
     }
 }
 
-// MARK: - Reusable branded components
+// MARK: - Surfaces
+//
+// A boxed section: paper panel behind a hairline border. This is the app's one
+// card treatment — square, flat, no shadow. It replaced an animated gradient-orb
+// background whose 460pt circle used to inflate every screen past the viewport
+// and clip the edges; the screen is now simply the paper (`Paper.bg`).
 
-/// Full-width primary action: brand gradient, subtle press feedback + shadow.
-struct BrandButtonStyle: ButtonStyle {
-    var enabled: Bool = true
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline)
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 15)
-            .background {
-                if enabled {
-                    LinearGradient.brand
-                } else {
-                    Color.gray.opacity(0.4)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .shadow(color: enabled ? Brand.red.opacity(0.35) : .clear,
-                    radius: 10, y: 5)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+struct PaperBox: ViewModifier {
+    var fill: Color = Paper.panel
+    var border: Color = Paper.line
+    func body(content: Content) -> some View {
+        content
+            .background(fill)
+            .overlay(Rectangle().stroke(border, lineWidth: 1))
     }
 }
 
-/// Item photo with a branded gradient+icon placeholder. Shows the real Square
-/// photo once `item.imageURL` exists; until then the placeholder looks intentional.
-/// Caller sets the frame.
-struct MenuItemImage: View {
-    let item: CatalogItem
-    var corner: CGFloat = 14
-    var iconSize: CGFloat = 28
+extension View {
+    /// Boxed hairline panel on paper — the only card surface in the app.
+    func paperBox(fill: Color = Paper.panel, border: Color = Paper.line) -> some View {
+        modifier(PaperBox(fill: fill, border: border))
+    }
+}
+
+// MARK: - Angular hatch
+//
+// Evenly-spaced 45° hairlines — the "printed on kraft paper" field the whole app
+// floats on. Drawn once in a Canvas so it stays crisp and cheap at any size, and
+// never intercepts touches. Faint tan on paper; low-opacity chalk on the board.
+
+struct DiagonalHatch: View {
+    var color: Color = Paper.hatch
+    var spacing: CGFloat = 15
+    var lineWidth: CGFloat = 1
+    /// Down-right (`true`) or up-right slope, so board and paper can lean opposite ways.
+    var descending: Bool = true
 
     var body: some View {
-        ZStack {
-            LinearGradient.brand
-            if let url = item.imageURL {
-                AsyncImage(url: url) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
-                    icon
+        Canvas { ctx, size in
+            var path = Path()
+            var x = -size.height
+            while x < size.width {
+                if descending {
+                    path.move(to: CGPoint(x: x, y: 0))
+                    path.addLine(to: CGPoint(x: x + size.height, y: size.height))
+                } else {
+                    path.move(to: CGPoint(x: x + size.height, y: 0))
+                    path.addLine(to: CGPoint(x: x, y: size.height))
                 }
-            } else {
-                icon
+                x += spacing
             }
+            ctx.stroke(path, with: .color(color), lineWidth: lineWidth)
         }
-        .clipped()
-        .clipShape(RoundedRectangle(cornerRadius: corner))
-    }
-
-    private var icon: some View {
-        Image(systemName: Brand.icon(for: item.category))
-            .font(.system(size: iconSize))
-            .foregroundStyle(.white.opacity(0.9))
+        .allowsHitTesting(false)
     }
 }
+
+// MARK: - Board hero header
+//
+// The black chalkboard header that tops a screen: an optional red eyebrow, a big
+// board-face title, and room for a trailing mark (a status stamp, say). A chalk
+// hatch runs behind it and a red baseline underlines it like a signwriter's rule.
+
+struct BoardHeader<Trailing: View>: View {
+    var eyebrow: String?
+    var title: String
+    /// Bottom edge: a thin solid red rule (default) or a bold red diagonal-stripe band.
+    var stripes: Bool = false
+    /// Chalk hatch strength inside the board (0 = flat black).
+    var boardHatch: Double = 0.05
+    @ViewBuilder var trailing: () -> Trailing
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                if let eyebrow {
+                    Text(eyebrow)
+                        .font(.system(.caption, design: .default).weight(.heavy)).tracking(1.5)
+                        .foregroundStyle(Paper.red)
+                }
+                Text(title).font(.board(50)).foregroundStyle(Paper.boardInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            trailing()
+        }
+        .padding(.horizontal, 20).padding(.vertical, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            ZStack {
+                Paper.board
+                if boardHatch > 0 {
+                    DiagonalHatch(color: Paper.boardHatch.opacity(boardHatch), spacing: 16, descending: false)
+                }
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if stripes {
+                DiagonalHatch(color: Paper.red, spacing: 11, lineWidth: 5, descending: true)
+                    .frame(height: 16).clipped().background(Paper.board)
+            } else {
+                Rectangle().fill(Paper.red).frame(height: 3)
+            }
+        }
+    }
+}
+
+extension BoardHeader where Trailing == EmptyView {
+    init(eyebrow: String? = nil, title: String, stripes: Bool = false, boardHatch: Double = 0.05) {
+        self.init(eyebrow: eyebrow, title: title, stripes: stripes, boardHatch: boardHatch) { EmptyView() }
+    }
+}
+
+/// The app's page background: warm paper under a faint, wide diagonal "kraft"
+/// field — identical on every screen. Panels drawn on top (`paperBox`) sit opaque
+/// over the field, so the lines only whisper through in the gutters. Use as a
+/// bottom ZStack layer, or via `.paperGround()` as a background modifier.
+struct PaperGroundLayer: View {
+    var body: some View {
+        ZStack {
+            Paper.bg
+            DiagonalHatch(color: Paper.hatch.opacity(0.28), spacing: 40, lineWidth: 1)
+        }
+        .ignoresSafeArea()
+    }
+}
+
+extension View {
+    func paperGround() -> some View {
+        background { PaperGroundLayer() }
+    }
+}
+
+// MARK: - Status stamp
+//
+// The green/red "OPEN"/"CLOSED" mark, set like an inked rubber stamp.
+
+struct StatusStamp: View {
+    let open: Bool
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle().fill(open ? Paper.open : Paper.red).frame(width: 7, height: 7)
+            Text(open ? "OPEN" : "CLOSED")
+                .font(.system(.caption, design: .default).weight(.heavy))
+                .tracking(1)
+                .foregroundStyle(open ? Paper.open : Paper.red)
+        }
+    }
+}
+
+// MARK: - Buttons
+//
+// The primary action is a solid red signage block. No gradient, no glow shadow —
+// just ink-firm colour and a small press state.
+
+struct SignButtonStyle: ButtonStyle {
+    var enabled: Bool = true
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        return configuration.label
+            .font(.system(.headline, design: .default).weight(.semibold))
+            .foregroundStyle(enabled ? Color.white : Paper.inkFaint)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(enabled ? (configuration.isPressed ? Paper.redDeep : Paper.red)
+                                : Paper.panelDim, in: shape)
+            .overlay(shape.stroke(enabled ? .clear : Paper.line, lineWidth: 1))
+            .contentShape(shape)
+            .scaleEffect(configuration.isPressed ? 0.99 : 1)
+    }
+}
+
+/// Light press feedback for buttons that supply their own background.
+struct PressableStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.99 : 1)
+            .opacity(configuration.isPressed ? 0.92 : 1)
+    }
+}
+
+// MARK: - Item image
+//
+// Real Square photos now exist, so show them honestly at size — no red gradient
+// behind, no SF Symbol pretending to be food. When a photo is missing, fall back
+// to a plain typographic tile (the dish's initial on paper) rather than faking one.
+
+struct MenuItemImage: View {
+    let item: CatalogItem
+
+    var body: some View {
+        Rectangle()
+            .fill(Paper.panel)
+            .overlay {
+                if let url = item.imageURL {
+                    AsyncImage(url: url) { img in
+                        img.resizable().scaledToFill()
+                    } placeholder: {
+                        fallback
+                    }
+                } else {
+                    fallback
+                }
+            }
+            .clipped()
+            .overlay(Rectangle().stroke(Paper.line, lineWidth: 1))
+            .accessibilityLabel(Text(item.name))
+    }
+
+    private var fallback: some View {
+        Text(item.name.prefix(1).uppercased())
+            .font(.board(40))
+            .foregroundStyle(Paper.inkFaint)
+    }
+}
+
+// MARK: - Slot time helpers (unchanged)
 
 /// Format a server slot (JS toISOString(), includes fractional seconds) as "6:45 PM".
 func slotTimeLabel(_ iso: String) -> String {
@@ -148,162 +321,4 @@ func slotDate(_ iso: String) -> Date? {
     let withFrac = ISO8601DateFormatter()
     withFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     return withFrac.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
-}
-
-// MARK: - App background ("wallpaper")
-
-/// A faint engineering grid used as subtle background texture.
-struct GridPattern: Shape {
-    var spacing: CGFloat = 44
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        var x = rect.minX
-        while x <= rect.maxX {
-            p.move(to: CGPoint(x: x, y: rect.minY))
-            p.addLine(to: CGPoint(x: x, y: rect.maxY))
-            x += spacing
-        }
-        var y = rect.minY
-        while y <= rect.maxY {
-            p.move(to: CGPoint(x: rect.minX, y: y))
-            p.addLine(to: CGPoint(x: rect.maxX, y: y))
-            y += spacing
-        }
-        return p
-    }
-}
-
-/// Deterministic film-grain speckle drawn once with Canvas (no image asset, no
-/// per-frame cost). `.overlay` blend lifts the flat black without banding.
-struct GrainOverlay: View {
-    var intensity: Double = 0.05
-    var body: some View {
-        Canvas { ctx, size in
-            var seed: UInt64 = 0x9E3779B97F4A7C15
-            func rnd() -> Double {                         // xorshift PRNG, fixed seed → stable grain
-                seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17
-                return Double(seed % 100_000) / 100_000.0
-            }
-            let count = Int(size.width * size.height / 480)
-            for _ in 0..<count {
-                let rect = CGRect(x: rnd() * size.width, y: rnd() * size.height,
-                                  width: 1.1, height: 1.1)
-                ctx.fill(Path(rect), with: .color(.white.opacity(rnd() * intensity)))
-            }
-        }
-        .blendMode(.overlay)
-        .allowsHitTesting(false)
-        .ignoresSafeArea()
-    }
-}
-
-/// Abstract black / crimson / ember backdrop that replaces flat fills app-wide.
-/// Mirrors the website hero: near-black base, layered radial ember glows that
-/// slowly breathe & drift, a faint edge-fading grid, and fine film grain.
-struct BrandBackground: View {
-    /// Pass `false` behind heavy scrolling lists to skip the animation.
-    var animated: Bool = true
-    @State private var t = false
-
-    var body: some View {
-        ZStack {
-            Color(hex: 0x0F0C0A)                                    // warm near-black base
-
-            // Top crimson bloom
-            RadialGradient(colors: [Brand.red.opacity(0.20),
-                                    Brand.redDeep.opacity(0.06), .clear],
-                           center: UnitPoint(x: 0.5, y: -0.05),
-                           startRadius: 0, endRadius: 540)
-
-            // Hot ember orb, lower-trailing — breathes & drifts (blurred circle
-            // so offset/scale/opacity tween smoothly; a RadialGradient would snap)
-            Circle()
-                .fill(Brand.ember)
-                .frame(width: 460, height: 460)
-                .blur(radius: 100)
-                .opacity(t ? 0.32 : 0.20)
-                .scaleEffect(t ? 1.10 : 0.95)
-                .offset(x: t ? 150 : 190, y: t ? 300 : 360)
-
-            // Soft warm orb, mid-leading — counter-drifts
-            Circle()
-                .fill(Brand.emberSoft)
-                .frame(width: 340, height: 340)
-                .blur(radius: 90)
-                .opacity(t ? 0.16 : 0.10)
-                .scaleEffect(t ? 1.05 : 0.92)
-                .offset(x: t ? -150 : -120, y: t ? -20 : 40)
-
-            // Faint grid, masked to fade at the edges
-            GridPattern(spacing: 44)
-                .stroke(Color.white.opacity(0.05), lineWidth: 0.6)
-                .mask {
-                    RadialGradient(colors: [.white, .clear],
-                                   center: UnitPoint(x: 0.5, y: 0.34),
-                                   startRadius: 0, endRadius: 480)
-                }
-
-            GrainOverlay()
-        }
-        .ignoresSafeArea()
-        .onAppear {
-            guard animated else { return }
-            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) {
-                t = true
-            }
-        }
-    }
-}
-
-/// Frosted "glass" surface: translucent material + a faint white hairline, so
-/// cards lift off the ember backdrop instead of reading as flat blocks.
-struct GlassCard: ViewModifier {
-    var cornerRadius: CGFloat = 18
-    func body(content: Content) -> some View {
-        content
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .strokeBorder(Color.white.opacity(0.09), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
-    }
-}
-
-/// Staggered fade-up used to give screens a little life on appear.
-struct AppearFadeUp: ViewModifier {
-    var delay: Double = 0
-    @State private var shown = false
-    func body(content: Content) -> some View {
-        content
-            .opacity(shown ? 1 : 0)
-            .offset(y: shown ? 0 : 16)
-            .onAppear {
-                withAnimation(.easeOut(duration: 0.55).delay(delay)) { shown = true }
-            }
-    }
-}
-
-extension View {
-    /// Frosted glass card surface (see `GlassCard`).
-    func glassCard(cornerRadius: CGFloat = 18) -> some View {
-        modifier(GlassCard(cornerRadius: cornerRadius))
-    }
-    /// Fade + rise in on appear, optionally staggered by `delay`.
-    func appearFadeUp(delay: Double = 0) -> some View {
-        modifier(AppearFadeUp(delay: delay))
-    }
-}
-
-/// Rounded price chip used on menu rows.
-struct PricePill: View {
-    let cents: Int
-    var body: some View {
-        Text(dollars(cents))
-            .font(.subheadline.weight(.bold).monospacedDigit())
-            .foregroundStyle(Brand.red)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(Brand.red.opacity(0.10), in: Capsule())
-    }
 }

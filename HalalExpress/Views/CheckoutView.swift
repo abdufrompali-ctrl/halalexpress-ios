@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct CheckoutView: View {
+    var onFinished: () -> Void = {}
+
     @EnvironmentObject private var cart: CartStore
     @EnvironmentObject private var orders: OrderHistoryStore
     @Environment(\.dismiss) private var dismiss
@@ -8,19 +10,22 @@ struct CheckoutView: View {
     @AppStorage("loyaltyName")  private var savedName = ""
     @AppStorage("loyaltyPhone") private var savedPhone = ""
     @AppStorage("loyaltyEmail") private var savedEmail = ""
+    @AppStorage("defaultTipPct") private var defaultTip = 15
 
     @State private var name = ""
     @State private var phone = ""
     @State private var email = ""
+    @FocusState private var focused: Bool
 
-    // Tip — 2×2 grid: 10% / 15% / 20% / Custom ($); nil = no tip
+    // Tip — 10% / 15% / 20% / Custom ($); nil = no tip
     private enum TipChoice: Equatable { case percent(Int); case custom }
     @State private var selectedTip: TipChoice?
     @State private var customTipCents = 0
     @State private var customTipText = ""
     @State private var showCustomTipSheet = false
+    @State private var tipPrefilled = false
 
-    // Pickup — ASAP or iOS-clock style dual wheels over server slots
+    // Pickup — ASAP or dual wheels over server slots
     private enum PickupMode: Hashable { case asap, scheduled }
     @State private var pickupMode: PickupMode = .asap
     @State private var shiftIndex = 0
@@ -28,6 +33,8 @@ struct CheckoutView: View {
     @State private var shifts: [Shift] = []
     @State private var hours: HoursStatus?
 
+    // Stable across retries so a re-tap after a lost response can't double-charge.
+    @State private var idempotencyKey = UUID().uuidString
     @State private var submitting = false
     @State private var errorMessage: String?
     @State private var confirmation: CheckoutResponse?
@@ -56,79 +63,84 @@ struct CheckoutView: View {
 
     var body: some View {
         Form {
-            Section("Your Info") {
+            Section("Your info") {
                 TextField("Name", text: $name)
-                    .textContentType(.name)
+                    .textContentType(.name).focused($focused)
                 TextField("Phone", text: $phone)
-                    .textContentType(.telephoneNumber)
-                    .keyboardType(.phonePad)
+                    .textContentType(.telephoneNumber).keyboardType(.phonePad).focused($focused)
                 TextField("Email (optional, for receipt)", text: $email)
-                    .textContentType(.emailAddress)
-                    .keyboardType(.emailAddress)
-                    .textInputAutocapitalization(.never)
+                    .textContentType(.emailAddress).keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never).focused($focused)
             }
+            .listRowBackground(Paper.panel)
 
             pickupSection
-
             tipSection
 
-            Section("Order Summary") {
+            Section("Order") {
                 summaryRow("Subtotal", cart.subtotalCents)
                 summaryRow("Tax (7%)", cart.taxCents)
-                summaryRow("Service Fee (3%)", cart.feeCents)
-                summaryRow("Tip", tipCents)
-                Divider()
+                summaryRow("Service fee (3%)", cart.feeCents)
+                if tipCents > 0 { summaryRow("Tip", tipCents) }
                 HStack {
-                    Text("Total").font(.title3.weight(.bold))
+                    Text("Total").font(.system(.body, design: .default).weight(.bold))
                     Spacer()
-                    Text(dollars(chargeCents))
-                        .font(.title3.weight(.bold).monospacedDigit())
-                        .foregroundStyle(Brand.red)
+                    Text(dollars(chargeCents)).font(.price(18)).foregroundStyle(Paper.red)
                 }
             }
+            .listRowBackground(Paper.panel)
 
             if let errorMessage {
-                Section { Text(errorMessage).foregroundStyle(.red) }
-            }
-        }
-        .navigationTitle("Checkout")
-        .safeAreaInset(edge: .bottom) {
-            Button {
-                Task { await submit() }
-            } label: {
-                HStack {
-                    if submitting {
-                        ProgressView().tint(.white).padding(.trailing, 4)
-                    } else {
-                        Image(systemName: "lock.fill")
-                    }
-                    Text("Pay")
-                    Spacer()
-                    Text(dollars(chargeCents)).monospacedDigit()
+                Section {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(Paper.red).font(.subheadline)
                 }
+                .listRowBackground(Paper.panel)
             }
-            .buttonStyle(BrandButtonStyle(enabled: formValid && !submitting))
-            .disabled(!formValid || submitting)
-            .padding(.horizontal)
-            .padding(.bottom, 8)
-            .background(.ultraThinMaterial)
         }
+        .scrollContentBackground(.hidden)
+        .paperGround()
+        .navigationTitle("Checkout")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Paper.bg, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer(); Button("Done") { focused = false }.tint(Paper.red)
+            }
+        }
+        .safeAreaInset(edge: .bottom) { payBar }
         .task { await loadOptions() }
         .navigationDestination(item: $confirmation) { conf in
-            OrderConfirmationView(confirmation: conf) {
-                confirmation = nil
-                dismiss()
-            }
+            OrderConfirmationView(confirmation: conf) { onFinished() }
         }
         .sheet(isPresented: $showCustomTipSheet) { customTipSheet }
         .sensoryFeedback(.selection, trigger: selectedTip)
     }
 
-    // MARK: - Pickup time (iOS-clock style)
+    // MARK: - Pay bar
+
+    private var payBar: some View {
+        Button { Task { await submit() } } label: {
+            HStack {
+                if submitting { ProgressView().tint(.white).padding(.trailing, 4) }
+                Text(submitting ? "Placing order…" : "Place order")
+                Spacer()
+                Text(dollars(chargeCents)).font(.price(17))
+            }
+        }
+        .buttonStyle(SignButtonStyle(enabled: formValid && !submitting))
+        .disabled(!formValid || submitting)
+        .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 8)
+        .background(Paper.bg)
+        .overlay(alignment: .top) { Rule() }
+    }
+
+    // MARK: - Pickup time
 
     @ViewBuilder
     private var pickupSection: some View {
-        Section("Pickup Time") {
+        Section("Pickup time") {
             if hours?.orderingOpen == true {
                 Picker("Pickup mode", selection: $pickupMode) {
                     Text("ASAP").tag(PickupMode.asap)
@@ -137,15 +149,13 @@ struct CheckoutView: View {
                 .pickerStyle(.segmented)
             } else if let msg = hours?.message {
                 Label(msg, systemImage: "clock.badge.exclamationmark")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+                    .font(.caption).foregroundStyle(Paper.red)
             }
 
             if pickupMode == .scheduled || hours?.orderingOpen != true {
                 if shifts.isEmpty {
                     Text("No order-ahead times available right now.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(.subheadline).foregroundStyle(Paper.inkSoft)
                 } else {
                     HStack(spacing: 0) {
                         Picker("Day", selection: $shiftIndex) {
@@ -153,9 +163,7 @@ struct CheckoutView: View {
                                 Text(shift.label).tag(i)
                             }
                         }
-                        .pickerStyle(.wheel)
-                        .frame(maxWidth: .infinity)
-                        .clipped()
+                        .pickerStyle(.wheel).frame(maxWidth: .infinity).clipped()
 
                         Picker("Time", selection: $slotIndex) {
                             let slots = shifts.indices.contains(shiftIndex) ? shifts[shiftIndex].slots : []
@@ -163,54 +171,47 @@ struct CheckoutView: View {
                                 Text(slotTimeLabel(slot)).tag(i)
                             }
                         }
-                        .pickerStyle(.wheel)
-                        .frame(maxWidth: .infinity)
-                        .clipped()
+                        .pickerStyle(.wheel).frame(maxWidth: .infinity).clipped()
                     }
                     .frame(height: 130)
                     .onChange(of: shiftIndex) { _, _ in slotIndex = 0 }
 
                     if shifts.indices.contains(shiftIndex), let loc = shifts[shiftIndex].location {
                         Label(loc.display, systemImage: "mappin.and.ellipse")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(Paper.inkSoft)
                     }
                 }
             }
         }
+        .listRowBackground(Paper.panel)
     }
 
-    // MARK: - Tip grid
+    // MARK: - Tip
 
     @ViewBuilder
     private var tipSection: some View {
-        Section("Add a Tip") {
+        Section("Tip") {
             VStack(spacing: 10) {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
-                                    GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10),
+                                    GridItem(.flexible(), spacing: 10)], spacing: 10) {
                     ForEach([10, 15, 20], id: \.self) { p in
                         tipTile(selected: selectedTip == .percent(p)) {
                             VStack(spacing: 2) {
-                                Text("\(p)%").font(.title2.weight(.heavy))
+                                Text("\(p)%").font(.system(.title3, design: .default).weight(.heavy))
                                 Text(dollars(Int((Double(cart.subtotalCents) * Double(p) / 100).rounded())))
-                                    .font(.caption.monospacedDigit())
-                                    .opacity(0.85)
+                                    .font(.price(12)).opacity(0.85)
                             }
                         } action: {
                             selectedTip = (selectedTip == .percent(p)) ? nil : .percent(p)
                         }
                     }
-
                     tipTile(selected: selectedTip == .custom) {
                         VStack(spacing: 2) {
                             if selectedTip == .custom && customTipCents > 0 {
-                                Text(dollars(customTipCents))
-                                    .font(.title3.weight(.heavy).monospacedDigit())
-                                Text("Custom").font(.caption).opacity(0.85)
+                                Text(dollars(customTipCents)).font(.price(16))
+                                Text("Custom").font(.caption)
                             } else {
-                                Image(systemName: "pencil")
-                                    .font(.title3.weight(.bold))
-                                Text("Custom").font(.caption.weight(.semibold))
+                                Text("Custom").font(.system(.headline, design: .default).weight(.semibold))
                             }
                         }
                     } action: {
@@ -219,16 +220,14 @@ struct CheckoutView: View {
                         showCustomTipSheet = true
                     }
                 }
-
                 Button("No tip") { selectedTip = nil }
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .buttonStyle(.borderless)
-                    .opacity(selectedTip == nil ? 0.45 : 1)
+                    .font(.footnote).foregroundStyle(Paper.inkSoft)
+                    .buttonStyle(.borderless).opacity(selectedTip == nil ? 0.45 : 1)
             }
-            .padding(.vertical, 6)
-            .listRowBackground(Color.clear)
+            .padding(.vertical, 4)
+            .listRowBackground(Paper.bg)
         }
+        .listRowBackground(Paper.panel)
     }
 
     private func tipTile<Content: View>(selected: Bool,
@@ -236,81 +235,72 @@ struct CheckoutView: View {
                                         action: @escaping () -> Void) -> some View {
         Button(action: action) {
             content()
-                .frame(maxWidth: .infinity)
-                .frame(height: 78)
-                .foregroundStyle(selected ? Color.white : Brand.red)
-                .background {
-                    if selected {
-                        LinearGradient.brand
-                    } else {
-                        Brand.red.opacity(0.08)
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shadow(color: selected ? Brand.red.opacity(0.35) : .clear, radius: 8, y: 4)
+                .frame(maxWidth: .infinity).frame(height: 66)
+                .foregroundStyle(selected ? Color.white : Paper.red)
+                .background(selected ? Paper.red : Paper.bg)
+                .overlay(Rectangle().stroke(Paper.red.opacity(selected ? 0 : 0.5), lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
 
     private var customTipSheet: some View {
         VStack(spacing: 20) {
-            Capsule().fill(.tertiary).frame(width: 36, height: 5).padding(.top, 10)
-            Text("Custom Tip").font(.headline)
-
+            Capsule().fill(Paper.line).frame(width: 36, height: 5).padding(.top, 10)
+            Text("Custom tip").font(.headline).foregroundStyle(Paper.ink)
             HStack(spacing: 6) {
-                Text("$")
-                    .font(.system(size: 34, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                Text("$").font(.system(size: 34, weight: .semibold)).foregroundStyle(Paper.inkSoft)
                 TextField("0.00", text: $customTipText)
                     .keyboardType(.decimalPad)
-                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                    .font(.system(size: 40, weight: .bold).monospacedDigit())
+                    .focused($focused)
             }
             .padding(.horizontal, 40)
-
-            Button("Set Tip") {
+            Button("Set tip") {
                 let normalized = customTipText.replacingOccurrences(of: ",", with: ".")
                 let cents = Int(((Double(normalized) ?? 0) * 100).rounded())
                 customTipCents = min(max(cents, 0), 100_000)   // server caps at $1,000
                 selectedTip = customTipCents > 0 ? .custom : nil
                 showCustomTipSheet = false
             }
-            .buttonStyle(BrandButtonStyle())
-            .padding(.horizontal)
-
+            .buttonStyle(SignButtonStyle()).padding(.horizontal, 20)
             Button("Cancel") { showCustomTipSheet = false }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
+                .font(.subheadline).foregroundStyle(Paper.inkSoft)
             Spacer(minLength: 0)
         }
+        .background(Paper.bg.ignoresSafeArea())
         .presentationDetents([.height(300)])
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer(); Button("Done") { focused = false }.tint(Paper.red)
+            }
+        }
     }
 
     // MARK: - Summary
 
     private func summaryRow(_ label: String, _ cents: Int) -> some View {
         HStack {
-            Text(label)
+            Text(label).font(.subheadline).foregroundStyle(Paper.inkSoft)
             Spacer()
-            Text(dollars(cents)).monospacedDigit()
+            Text(dollars(cents)).font(.price(14)).foregroundStyle(Paper.ink)
         }
-        .font(.subheadline)
     }
 
     // MARK: - Data
 
     private func loadOptions() async {
-        // Prefill from the saved Rewards profile so returning customers breeze through.
         if name.isEmpty { name = savedName }
         if phone.isEmpty { phone = savedPhone }
         if email.isEmpty { email = savedEmail }
+        // Honour the Settings default-tip once, on first load.
+        if !tipPrefilled {
+            tipPrefilled = true
+            if [10, 15, 20].contains(defaultTip) { selectedTip = .percent(defaultTip) }
+        }
 
         hours = try? await APIClient.shared.hours()
         shifts = (try? await APIClient.shared.scheduleSlots())?.shifts ?? []
-        // Truck closed → ASAP impossible; land on the scheduler.
-        if hours?.orderingOpen != true {
-            pickupMode = .scheduled
-        }
+        if hours?.orderingOpen != true { pickupMode = .scheduled }
     }
 
     private func submit() async {
@@ -330,16 +320,15 @@ struct CheckoutView: View {
                     email: email.isEmpty ? nil : email
                 ),
                 sourceId: sourceId,
-                idempotencyKey: UUID().uuidString,
+                idempotencyKey: idempotencyKey,     // stable across retries
                 tipCents: tipCents > 0 ? tipCents : nil,
                 scheduledPickupAt: pickupMode == .scheduled ? selectedSlot : nil
             )
             let resp = try await APIClient.shared.checkout(req)
-            // Log the order locally (powers the reorder list) before clearing the cart.
             let lines = cart.lines.map {
                 OrderLine(itemId: $0.item.id, name: $0.item.name,
                           option: $0.option, customizations: $0.customizations,
-                          quantity: $0.quantity)
+                          addOnCents: $0.addOnCents, quantity: $0.quantity)
             }
             orders.add(OrderRecord(id: resp.orderId, date: Date(),
                                    lines: lines, totalCents: Int((resp.total * 100).rounded())))

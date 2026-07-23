@@ -4,96 +4,97 @@ struct OrderConfirmationView: View {
     let confirmation: CheckoutResponse
     var onDone: () -> Void
 
-    @State private var celebrate = false
-
-    private var pickupDate: Date? {
-        confirmation.scheduledPickupAt.flatMap(slotDate)
-    }
+    private var pickupDate: Date? { confirmation.scheduledPickupAt.flatMap(slotDate) }
 
     var body: some View {
-        List {
-            Section {
-                VStack(spacing: 12) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 64))
-                        .foregroundStyle(.green)
-                        .scaleEffect(celebrate ? 1 : 0.3)
-                        .rotationEffect(.degrees(celebrate ? 0 : -20))
-                        .shadow(color: .green.opacity(celebrate ? 0.35 : 0), radius: 12, y: 4)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                // Headline block
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("ORDER IN").font(.board(56)).foregroundStyle(Paper.red)
+                    Rectangle().fill(Paper.red).frame(width: 120, height: 4)
+                    Text("Thanks, \(confirmation.customerName).")
+                        .font(.system(.title3, design: .default).weight(.semibold))
+                        .foregroundStyle(Paper.ink)
+                        .padding(.top, 8)
 
-                    Text("Thanks, \(confirmation.customerName)!")
-                        .font(.title2.bold())
-
-                    // Scheduled → live countdown; ASAP → pulsing "preparing" indicator.
                     if let date = pickupDate {
                         TimelineView(.periodic(from: .now, by: 60)) { _ in
-                            VStack(spacing: 3) {
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text("Ready around \(date.formatted(date: .omitted, time: .shortened))")
-                                    .font(.headline)
+                                    .font(.headline).foregroundStyle(Paper.ink)
                                 if date > Date() {
                                     Text(date, format: .relative(presentation: .named))
-                                        .font(.subheadline)
-                                        .foregroundStyle(Brand.ember)
+                                        .font(.subheadline).foregroundStyle(Paper.inkSoft)
                                 }
                                 if let label = confirmation.scheduledLabel {
-                                    Text(label)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                    Text(label).font(.caption).foregroundStyle(Paper.inkSoft)
                                 }
                             }
                         }
+                        .padding(.top, 4)
                     } else {
-                        Label("Preparing your order…", systemImage: "flame.fill")
-                            .symbolEffect(.pulse)
-                            .font(.headline)
-                            .foregroundStyle(Brand.ember)
-                        Text("We'll have it ready for you shortly.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                        Text("We're preparing it now — we'll have it ready shortly.")
+                            .font(.subheadline).foregroundStyle(Paper.inkSoft).padding(.top, 4)
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-            }
-            .listRowBackground(Color.clear)
+                .padding(.horizontal, 20).padding(.top, 24).padding(.bottom, 20)
 
-            Section("Receipt") {
-                row("Subtotal", confirmation.subtotal)
-                row("Tax", confirmation.tax)
-                row("Service Fee", confirmation.serviceFee)
-                if confirmation.tip > 0 { row("Tip", confirmation.tip) }
-                row("Total Charged", confirmation.total, bold: true)
-            }
+                Rule()
 
-            Section {
-                LabeledContent("Order ID", value: confirmation.orderId)
-                    .font(.caption)
-                LabeledContent("Status", value: confirmation.status)
-                    .font(.caption)
-            }
+                // Receipt
+                VStack(spacing: 8) {
+                    receiptRow("Subtotal", confirmation.subtotal)
+                    receiptRow("Tax", confirmation.tax)
+                    receiptRow("Service fee", confirmation.serviceFee)
+                    if confirmation.tip > 0 { receiptRow("Tip", confirmation.tip) }
+                    Rule().padding(.vertical, 2)
+                    receiptRow("Total charged", confirmation.total, bold: true)
+                }
+                .padding(.horizontal, 20).padding(.vertical, 16)
 
-            Section {
-                Button("Done") { onDone() }
-                    .buttonStyle(BrandButtonStyle())
-                    .listRowBackground(Color.clear)
+                Rule()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    metaRow("Order", confirmation.orderId)
+                    metaRow("Status", confirmation.status.capitalized)
+                }
+                .padding(.horizontal, 20).padding(.vertical, 16)
             }
         }
-        .navigationTitle("Order Placed")
+        .scrollContentBackground(.hidden)
+        .paperGround()
+        .navigationTitle("Order placed")
+        .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
-        .sensoryFeedback(.success, trigger: celebrate)
-        .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.55)) {
-                celebrate = true
-            }
+        .toolbarBackground(Paper.bg, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .safeAreaInset(edge: .bottom) {
+            Button("Done") { onDone() }
+                .buttonStyle(SignButtonStyle())
+                .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 8)
+                .background(Paper.bg)
+                .overlay(alignment: .top) { Rule() }
+        }
+        .sensoryFeedback(.success, trigger: confirmation.orderId)
+    }
+
+    private func receiptRow(_ label: String, _ amount: Double, bold: Bool = false) -> some View {
+        HStack {
+            Text(label)
+                .font(bold ? .system(.body, design: .default).weight(.bold) : .subheadline)
+                .foregroundStyle(bold ? Paper.ink : Paper.inkSoft)
+            Spacer()
+            Text(String(format: "$%.2f", amount))
+                .font(.price(bold ? 17 : 14)).foregroundStyle(bold ? Paper.red : Paper.ink)
         }
     }
 
-    private func row(_ label: String, _ amount: Double, bold: Bool = false) -> some View {
+    private func metaRow(_ label: String, _ value: String) -> some View {
         HStack {
-            Text(label)
+            Text(label).font(.caption).foregroundStyle(Paper.inkFaint)
             Spacer()
-            Text(String(format: "$%.2f", amount)).monospacedDigit()
+            Text(value).font(.system(.caption, design: .monospaced)).foregroundStyle(Paper.inkSoft)
         }
-        .fontWeight(bold ? .semibold : .regular)
     }
 }

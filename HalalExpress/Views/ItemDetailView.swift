@@ -1,254 +1,225 @@
 import SwiftUI
 
+/// One dish, on paper. Photo, choice of variation, topping/sauce/extra checklists
+/// (paid extras show their upcharge), quantity, and a sticky ADD bar that carries
+/// the real total. No wizard, no progress bar — one honest scroll.
 struct ItemDetailView: View {
     let item: CatalogItem
     @EnvironmentObject private var cart: CartStore
     @Environment(\.dismiss) private var dismiss
 
-    private enum Step: Hashable {
-        case choice, toppings, sauces, extras, review
-    }
-
     @State private var selectedOption: String?
     @State private var selections: [String: Bool] = [:]   // modifier id -> on/off
     @State private var quantity = 1
-    @State private var stepIndex = 0
+    @State private var addPita = false                    // client-side add-on shown on the Sauces page
     @State private var addedTrigger = false
 
-    // Steps are derived from what the item actually offers; Review is always last.
-    private var steps: [Step] {
-        var s: [Step] = []
-        if item.options != nil { s.append(.choice) }
-        if !(item.customize?.toppings ?? []).isEmpty { s.append(.toppings) }
-        if !(item.customize?.sauces ?? []).isEmpty { s.append(.sauces) }
-        if !(item.customize?.extras ?? []).isEmpty { s.append(.extras) }
-        s.append(.review)
-        return s
+    // An empty options array is the same as no options — don't dead-end on it.
+    private var options: [String]? {
+        guard let o = item.options, !o.isEmpty else { return nil }
+        return o
     }
-    private var isBuilder: Bool { steps.count > 1 }
-    private var currentStep: Step { steps[min(stepIndex, steps.count - 1)] }
-
-    private var totalCents: Int { Int((item.price * 100).rounded()) * quantity }
-    private var canAdd: Bool { item.options == nil || selectedOption != nil }
+    private var allMods: [Modifier] {
+        (item.customize?.toppings ?? []) + (item.customize?.sauces ?? []) + (item.customize?.extras ?? [])
+    }
+    private var addOnCents: Int {
+        allMods.reduce(0) { $0 + ((selections[$1.id] ?? $1.isChecked) ? $1.priceCents : 0) }
+    }
+    private var baseCents: Int { Int((item.price * 100).rounded()) }
+    private var totalCents: Int { (baseCents + addOnCents) * quantity }
+    private var canAdd: Bool { options == nil || selectedOption != nil }
 
     var body: some View {
-        Form {
-            Section {
-                MenuItemImage(item: item, corner: 16, iconSize: 48)
-                    .frame(height: isBuilder ? 140 : 190)
-                    .frame(maxWidth: .infinity)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                MenuItemImage(item: item).frame(height: 220).frame(maxWidth: .infinity)
 
-            if isBuilder {
-                Section {
-                    stepHeader
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                }
-
-                stepContent
-
-                Section {
-                    HStack {
-                        if stepIndex > 0 {
-                            Button {
-                                withAnimation(.snappy) { stepIndex -= 1 }
-                            } label: {
-                                Label("Back", systemImage: "chevron.left")
-                            }
-                            .buttonStyle(.borderless)
-                        }
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(item.name).font(.board(34)).foregroundStyle(Paper.ink)
                         Spacer()
-                        if stepIndex < steps.count - 1 {
-                            Button {
-                                withAnimation(.snappy) { stepIndex += 1 }
-                            } label: {
-                                Label("Next", systemImage: "chevron.right")
-                                    .labelStyle(.titleAndIcon)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(Brand.red)
-                            .disabled(currentStep == .choice && selectedOption == nil)
-                        }
+                        Text(dollars(baseCents)).font(.price(18)).foregroundStyle(Paper.ink)
                     }
-                    .listRowBackground(Color.clear)
+                    if !item.desc.isEmpty {
+                        Text(item.desc).font(.subheadline).foregroundStyle(Paper.inkSoft)
+                    }
                 }
-            } else {
-                simpleContent
+                .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 8)
+
+                if let options { choiceSection(options) }
+                modifierSection("Toppings", item.customize?.toppings)
+                saucesSection
+                modifierSection("Extras", item.customize?.extras)
+                quantitySection
             }
+            .padding(.bottom, 12)
         }
+        .scrollContentBackground(.hidden)
+        .background(Paper.bg.ignoresSafeArea())
         .navigationTitle(item.name)
         .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom) {
-            Button {
-                cart.add(item, option: selectedOption,
-                         customizations: customizationSummary(), quantity: quantity)
-                addedTrigger.toggle()
-                dismiss()
-            } label: {
-                HStack {
-                    Image(systemName: "cart.badge.plus")
-                    Text("Add to Cart")
-                    Spacer()
-                    Text(dollars(totalCents)).monospacedDigit()
-                }
-            }
-            .buttonStyle(BrandButtonStyle(enabled: canAdd))
-            .disabled(!canAdd)
-            .padding(.horizontal)
-            .padding(.bottom, 8)
-            .background(.ultraThinMaterial)
-        }
+        .toolbarBackground(Paper.bg, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .safeAreaInset(edge: .bottom) { addBar }
         .sensoryFeedback(.success, trigger: addedTrigger)
         .onAppear {
-            if selections.isEmpty, let c = item.customize {
-                for mod in (c.toppings ?? []) + (c.sauces ?? []) + (c.extras ?? []) {
-                    selections[mod.id] = mod.isChecked
-                }
+            if selections.isEmpty {
+                for mod in allMods { selections[mod.id] = mod.isChecked }
             }
-            if selectedOption == nil { selectedOption = item.options?.first }
+            if selectedOption == nil { selectedOption = options?.first }
         }
     }
 
-    // MARK: - Builder steps
+    // MARK: - Sections
 
-    private var stepHeader: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 6) {
-                ForEach(steps.indices, id: \.self) { i in
-                    Capsule()
-                        .fill(i <= stepIndex ? Brand.red : Color.gray.opacity(0.25))
-                        .frame(height: 5)
-                }
-            }
+    private func sectionHeader(_ title: String) -> some View {
+        VStack(spacing: 0) {
+            Rule()
             HStack {
-                Text(stepTitle(currentStep))
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(Brand.red)
+                Text(title.uppercased())
+                    .font(.system(.subheadline, design: .default).weight(.heavy)).tracking(1)
+                    .foregroundStyle(Paper.ink)
                 Spacer()
-                Text("Step \(stepIndex + 1) of \(steps.count)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
+            .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 8)
         }
     }
 
-    private func stepTitle(_ step: Step) -> String {
-        switch step {
-        case .choice:   return "Make It Yours"
-        case .toppings: return "Pick Your Toppings"
-        case .sauces:   return "Sauce It Up"
-        case .extras:   return "Any Extras?"
-        case .review:   return "Review Your \(item.name)"
-        }
-    }
-
-    @ViewBuilder
-    private var stepContent: some View {
-        switch currentStep {
-        case .choice:
-            if let options = item.options {
-                Section("Choice") {
-                    Picker("Option", selection: $selectedOption) {
-                        ForEach(options, id: \.self) { Text($0).tag(Optional($0)) }
-                    }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                }
-            }
-        case .toppings:
-            modifierSection("Toppings", item.customize?.toppings)
-        case .sauces:
-            modifierSection("Sauces", item.customize?.sauces)
-        case .extras:
-            modifierSection("Extras", item.customize?.extras)
-        case .review:
-            Section("Your Order") {
-                if let selectedOption {
-                    LabeledContent("Choice", value: selectedOption)
-                }
-                LabeledContent("Customizations",
-                               value: customizationSummary() ?? "As served")
-                Stepper {
-                    HStack {
-                        Text("Quantity")
+    private func choiceSection(_ options: [String]) -> some View {
+        VStack(spacing: 0) {
+            sectionHeader("Choose")
+            ForEach(options, id: \.self) { opt in
+                Button { selectedOption = opt } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: selectedOption == opt ? "largecircle.fill.circle" : "circle")
+                            .foregroundStyle(selectedOption == opt ? Paper.red : Paper.inkFaint)
+                        Text(opt).foregroundStyle(Paper.ink)
                         Spacer()
-                        Text("\(quantity)")
-                            .font(.body.weight(.semibold).monospacedDigit())
-                            .foregroundStyle(Brand.red)
                     }
-                } onIncrement: { if quantity < 20 { quantity += 1 } }
-                  onDecrement: { if quantity > 1 { quantity -= 1 } }
-            }
-        }
-    }
-
-    // MARK: - Simple (non-customizable) layout
-
-    @ViewBuilder
-    private var simpleContent: some View {
-        Section {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(item.name).font(.title2.bold())
-                if !item.desc.isEmpty {
-                    Text(item.desc).font(.subheadline).foregroundStyle(.secondary)
+                    .padding(.horizontal, 20).padding(.vertical, 13).contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                Rule().padding(.leading, 20)
             }
-            .padding(.vertical, 2)
-        }
-        .listRowBackground(Color.clear)
-
-        Section {
-            Stepper {
-                HStack {
-                    Text("Quantity")
-                    Spacer()
-                    Text("\(quantity)")
-                        .font(.body.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(Brand.red)
-                }
-            } onIncrement: { if quantity < 20 { quantity += 1 } }
-              onDecrement: { if quantity > 1 { quantity -= 1 } }
         }
     }
 
     @ViewBuilder
     private func modifierSection(_ title: String, _ mods: [Modifier]?) -> some View {
         if let mods, !mods.isEmpty {
-            Section(title) {
+            VStack(spacing: 0) {
+                sectionHeader(title)
                 ForEach(mods) { mod in
-                    let on = selections[mod.id] ?? mod.isChecked
-                    Button {
-                        selections[mod.id] = !on
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: on ? "checkmark.circle.fill" : "circle")
-                                .font(.title3)
-                                .foregroundStyle(on ? Brand.red : Color.secondary)
-                            Text(mod.label).foregroundStyle(.primary)
-                            Spacer()
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                    modRow(mod, label: mod.label)
+                    Rule().padding(.leading, 20)
                 }
             }
         }
     }
 
-    /// Diff selections against defaults into the note the kitchen ticket shows,
-    /// matching the website's convention: "No Lettuce, Add Corn".
+    /// One toggle row for a modifier (checkbox + label + optional upcharge).
+    private func modRow(_ mod: Modifier, label: String) -> some View {
+        let on = selections[mod.id] ?? mod.isChecked
+        return Button { selections[mod.id] = !on } label: {
+            HStack(spacing: 12) {
+                Image(systemName: on ? "checkmark.square.fill" : "square")
+                    .foregroundStyle(on ? Paper.red : Paper.inkFaint)
+                Text(label).foregroundStyle(Paper.ink)
+                Spacer()
+                if mod.priceCents > 0 {
+                    Text("+\(dollars(mod.priceCents))")
+                        .font(.price(14)).foregroundStyle(Paper.inkSoft)
+                }
+            }
+            .padding(.horizontal, 20).padding(.vertical, 13).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    /// Sauces page: dish names shown without the word "Sauce", plus a Pita Bread add-on.
+    @ViewBuilder
+    private var saucesSection: some View {
+        if let sauces = item.customize?.sauces, !sauces.isEmpty {
+            VStack(spacing: 0) {
+                sectionHeader("Sauces")
+                ForEach(sauces) { mod in
+                    modRow(mod, label: sauceDisplay(mod.label))
+                    Rule().padding(.leading, 20)
+                }
+                Button { addPita.toggle() } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: addPita ? "checkmark.square.fill" : "square")
+                            .foregroundStyle(addPita ? Paper.red : Paper.inkFaint)
+                        Text("Pita Bread").foregroundStyle(Paper.ink)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20).padding(.vertical, 13).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(addPita ? .isSelected : [])
+                Rule().padding(.leading, 20)
+            }
+        }
+    }
+
+    /// Trim "Sauce" from a modifier label for display ("White Sauce" -> "White").
+    private func sauceDisplay(_ label: String) -> String {
+        let s = label.replacingOccurrences(of: " Sauce", with: "")
+                     .replacingOccurrences(of: "Sauce", with: "")
+                     .trimmingCharacters(in: .whitespaces)
+        return s.isEmpty ? label : s
+    }
+
+    private var quantitySection: some View {
+        VStack(spacing: 0) {
+            Rule()
+            HStack {
+                Text("Quantity")
+                    .font(.system(.body, design: .default).weight(.semibold))
+                    .foregroundStyle(Paper.ink)
+                Spacer()
+                Stepper(value: $quantity, in: 1...20) {
+                    Text("\(quantity)").font(.price(17)).foregroundStyle(Paper.red)
+                }
+                .fixedSize()
+            }
+            .padding(.horizontal, 20).padding(.vertical, 12)
+        }
+    }
+
+    // MARK: - Add bar
+
+    private var addBar: some View {
+        Button {
+            cart.add(item, option: selectedOption, customizations: customizationSummary(),
+                     addOnCents: addOnCents, quantity: quantity)
+            addedTrigger.toggle()
+            dismiss()
+        } label: {
+            HStack {
+                Text("Add to order")
+                Spacer()
+                Text(dollars(totalCents)).font(.price(17))
+            }
+        }
+        .buttonStyle(SignButtonStyle(enabled: canAdd))
+        .disabled(!canAdd)
+        .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 8)
+        .background(Paper.bg)
+        .overlay(alignment: .top) { Rule() }
+    }
+
+    /// Diff selections against defaults into the kitchen-ticket note, matching the
+    /// website: "No Lettuce, Add Corn".
     private func customizationSummary() -> String? {
-        guard let c = item.customize else { return nil }
         var parts: [String] = []
-        for mod in (c.toppings ?? []) + (c.sauces ?? []) + (c.extras ?? []) {
+        for mod in allMods {
             let on = selections[mod.id] ?? mod.isChecked
             if mod.isChecked && !on { parts.append("No \(mod.label)") }
             if !mod.isChecked && on { parts.append("Add \(mod.label)") }
         }
+        if addPita { parts.append("Add Pita Bread") }
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 }

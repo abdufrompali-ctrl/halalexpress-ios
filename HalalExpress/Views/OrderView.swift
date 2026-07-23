@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The Order tab — Chipotle-warm: a featured "house favorite" hero, category
-/// chips, big item cards with monospaced prices, and a floating cart bar.
+/// The Menu — a printed board on paper. A featured dish, category headings, and
+/// dish rows that run name → dotted leader → price. A solid red order bar rides
+/// the bottom once there's something in the cart.
 struct OrderView: View {
     @EnvironmentObject private var cart: CartStore
 
@@ -14,47 +15,46 @@ struct OrderView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                BrandBackground(animated: false)
+                PaperGroundLayer()
                 content
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: CatalogItem.self) { ItemDetailView(item: $0) }
             .task { await load() }
-            .sheet(isPresented: $showCart) { CartView() }
+            .refreshable { await load() }
+            .sheet(isPresented: $showCart) { CartView(onFinished: { showCart = false }) }
         }
     }
 
     @ViewBuilder private var content: some View {
         if let catalog {
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                     header
                     if let feat = catalog.items.first {
-                        FeaturedCard(item: feat)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 2)
+                        FeaturedDish(item: feat).padding(.horizontal, 20).padding(.bottom, 8)
                     }
-                    categoryBar(catalog)
-                    itemList(catalog)
+                    Section {
+                        itemList(catalog)
+                    } header: {
+                        categoryBar(catalog)
+                    }
                 }
-                .padding(.bottom, 20)
+                .padding(.bottom, 24)
             }
             .scrollContentBackground(.hidden)
-            .safeAreaInset(edge: .bottom) {
-                if !cart.isEmpty { cartBar }
-            }
+            .safeAreaInset(edge: .bottom) { if !cart.isEmpty { orderBar } }
         } else if let error {
             ContentUnavailableView {
                 Label("Menu unavailable", systemImage: "wifi.exclamationmark")
             } description: {
                 Text(error)
             } actions: {
-                Button("Retry") { Task { await load() } }
-                    .buttonStyle(.borderedProminent).tint(Brand.red)
+                Button("Try again") { Task { await load() } }
+                    .buttonStyle(.borderedProminent).tint(Paper.red)
             }
         } else {
-            ProgressView("Loading menu…")
-                .controlSize(.large).tint(Brand.red)
+            ProgressView().controlSize(.large).tint(Paper.red)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -62,58 +62,45 @@ struct OrderView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Order")
-                    .font(.display(44))
-                    .foregroundStyle(.white)
-                Text(hours?.orderingOpen == true ? "Pickup · open now" : "Pickup · order ahead")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.4))
-            }
-            Spacer()
-            if let city = hours?.location?.city ?? hours?.location?.label {
-                HStack(spacing: 6) {
-                    Circle().fill(hours?.orderingOpen == true ? Color(hex: 0x3ECF7A) : Brand.ember)
-                        .frame(width: 7, height: 7)
-                    Text(city).font(.caption.weight(.semibold))
+        VStack(alignment: .leading, spacing: 0) {
+            BoardHeader(title: "MENU") { StatusStamp(open: hours?.orderingOpen == true) }
+            Group {
+                if let loc = hours?.location {
+                    Text([loc.address, loc.city].compactMap { $0 }.joined(separator: " · "))
+                        .font(.subheadline).foregroundStyle(Paper.inkSoft)
+                } else {
+                    Text("Pickup · order ahead").font(.subheadline).foregroundStyle(Paper.inkSoft)
                 }
-                .foregroundStyle(.white.opacity(0.65))
-                .padding(.horizontal, 12).padding(.vertical, 7)
-                .background(Brand.warmCard)
-                .clipShape(RoundedRectangle(cornerRadius: Brand.r))
-                .overlay(RoundedRectangle(cornerRadius: Brand.r).strokeBorder(Brand.cardBrd, lineWidth: 1))
             }
+            .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 14)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
-        .padding(.bottom, 8)
     }
 
-    // MARK: - Category chips
+    // MARK: - Category headings (pinned)
 
     private func categoryBar(_ catalog: Catalog) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 7) {
-                ForEach(catalog.categories, id: \.self) { cat in
-                    let on = (selected ?? catalog.categories.first) == cat
-                    Button { selected = cat } label: {
-                        Text(cat.capitalized)
-                            .font(.system(size: 12.5, weight: .bold))
-                            .foregroundStyle(on ? .white : .white.opacity(0.5))
-                            .padding(.horizontal, 15).padding(.vertical, 9)
-                            .background {
-                                if on { LinearGradient.brand } else { Brand.warmCard }
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 22) {
+                    ForEach(catalog.categories, id: \.self) { cat in
+                        let on = (selected ?? catalog.categories.first) == cat
+                        Button { selected = cat } label: {
+                            VStack(spacing: 5) {
+                                Text(cat.capitalized)
+                                    .font(.system(.subheadline, design: .default).weight(.bold))
+                                    .foregroundStyle(on ? Paper.ink : Paper.inkFaint)
+                                Rectangle().fill(on ? Paper.red : .clear).frame(height: 2)
                             }
-                            .clipShape(RoundedRectangle(cornerRadius: Brand.r))
-                            .overlay(RoundedRectangle(cornerRadius: Brand.r)
-                                .strokeBorder(on ? Color.clear : Brand.cardBrd, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 20)
             }
-            .padding(.horizontal, 20).padding(.vertical, 12)
+            .padding(.top, 6)
+            Rule()
         }
+        .background(Paper.bg)
     }
 
     // MARK: - Item list
@@ -121,41 +108,34 @@ struct OrderView: View {
     private func itemList(_ catalog: Catalog) -> some View {
         let cat = selected ?? catalog.categories.first ?? ""
         let items = catalog.items.filter { $0.category == cat }
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                Text(cat.capitalized).font(.display(18)).foregroundStyle(.white)
-                Rectangle().fill(LinearGradient(colors: [.white.opacity(0.14), .clear],
-                                                startPoint: .leading, endPoint: .trailing))
-                    .frame(height: 1)
+        return VStack(spacing: 0) {
+            ForEach(items) { item in
+                NavigationLink(value: item) { DishRow(item: item) }
+                    .buttonStyle(.plain)
+                Rule().padding(.leading, 20)
             }
-            .padding(.horizontal, 20).padding(.bottom, 10)
-
-            ForEach(items) { OrderRow(item: $0) }
         }
     }
 
-    // MARK: - Floating cart
+    // MARK: - Order bar
 
-    private var cartBar: some View {
+    private var orderBar: some View {
         Button { showCart = true } label: {
             HStack(spacing: 12) {
                 Text("\(cart.itemCount)")
-                    .font(.price(13))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(Color.black.opacity(0.26))
-                    .clipShape(RoundedRectangle(cornerRadius: 2))
-                Text("View order").font(.system(size: 14.5, weight: .semibold)).foregroundStyle(.white)
+                    .font(.price(15)).foregroundStyle(Paper.red)
+                    .frame(minWidth: 26).padding(.vertical, 4)
+                    .background(Color.white)
+                Text("View order").font(.system(.headline, design: .default).weight(.semibold))
                 Spacer()
-                Text(dollars(cart.totalCents)).font(.price(17)).foregroundStyle(.white)
+                Text(dollars(cart.totalCents)).font(.price(17))
             }
-            .padding(.horizontal, 16).padding(.vertical, 13)
-            .background(LinearGradient.brand)
-            .clipShape(RoundedRectangle(cornerRadius: Brand.r))
-            .shadow(color: Brand.red.opacity(0.4), radius: 18, y: 8)
-            .padding(.horizontal, 14).padding(.bottom, 8)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16).padding(.vertical, 14)
+            .background(Paper.red)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("View order, \(cart.itemCount) items, \(dollars(cart.totalCents))")
     }
 
     // MARK: - Data
@@ -164,95 +144,79 @@ struct OrderView: View {
         do {
             async let cat = APIClient.shared.catalog()
             async let hrs = APIClient.shared.hours()
-            catalog = try await cat
+            let loaded = try await cat
+            catalog = loaded
             hours = try? await hrs
-            if selected == nil { selected = catalog?.categories.first }
+            // Keep the selected category valid across reloads.
+            if selected == nil || !(loaded.categories.contains(selected!)) {
+                selected = loaded.categories.first
+            }
             error = nil
         } catch {
-            self.error = error.localizedDescription
+            if catalog == nil { self.error = error.localizedDescription }
         }
     }
 }
 
-// MARK: - Featured hero card
+// MARK: - Featured dish
 
-private struct FeaturedCard: View {
+private struct FeaturedDish: View {
     let item: CatalogItem
     var body: some View {
         NavigationLink(value: item) {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    MenuItemImage(item: item, corner: 0, iconSize: 46)
-                        .frame(height: 150).frame(maxWidth: .infinity)
-                    Text("HOUSE FAVORITE")
-                        .font(.caption2.weight(.heavy)).kerning(1)
+                    MenuItemImage(item: item).frame(height: 190).frame(maxWidth: .infinity)
+                    Text("MOST POPULAR")
+                        .font(.system(.caption, design: .default).weight(.heavy)).tracking(1)
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 11).padding(.vertical, 6)
-                        .background(Brand.ember)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(Paper.red)
+                        .padding(10)
                 }
-                HStack(alignment: .bottom, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.name).font(.display(24)).foregroundStyle(.white)
-                        if !item.desc.isEmpty {
-                            Text(item.desc).font(.caption).foregroundStyle(.white.opacity(0.55)).lineLimit(2)
-                        }
-                        Text(dollars(Int((item.price * 100).rounded())))
-                            .font(.price(15)).foregroundStyle(.white).padding(.top, 4)
-                    }
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(item.name).font(.board(26)).foregroundStyle(Paper.ink)
                     Spacer()
-                    Text("Add")
-                        .font(.subheadline.weight(.heavy)).foregroundStyle(.white)
-                        .padding(.horizontal, 20).padding(.vertical, 12)
-                        .background(LinearGradient.brand)
-                        .clipShape(RoundedRectangle(cornerRadius: Brand.r))
+                    Text(dollars(Int((item.price * 100).rounded())))
+                        .font(.price(17)).foregroundStyle(Paper.ink)
                 }
-                .padding(14)
+                .padding(.horizontal, 12).padding(.top, 10)
+                if !item.desc.isEmpty {
+                    Text(item.desc).font(.subheadline).foregroundStyle(Paper.inkSoft)
+                        .lineLimit(2).padding(.horizontal, 12).padding(.top, 2).padding(.bottom, 12)
+                } else {
+                    Color.clear.frame(height: 12)
+                }
             }
-            .background(Brand.warmCard)
-            .clipShape(RoundedRectangle(cornerRadius: Brand.r))
-            .overlay(RoundedRectangle(cornerRadius: Brand.r).strokeBorder(Brand.cardBrd, lineWidth: 1))
-            .shadow(color: .black.opacity(0.35), radius: 18, y: 10)
+            .paperBox()
         }
         .buttonStyle(.plain)
     }
 }
 
-// MARK: - Item row
+// MARK: - Dish row
 
-private struct OrderRow: View {
+private struct DishRow: View {
     let item: CatalogItem
     var body: some View {
-        NavigationLink(value: item) {
-            HStack(spacing: 14) {
-                MenuItemImage(item: item, corner: 2, iconSize: 26)
-                    .frame(width: 66, height: 66)
-                VStack(alignment: .leading, spacing: 3) {
+        HStack(alignment: .top, spacing: 14) {
+            MenuItemImage(item: item).frame(width: 64, height: 64)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(item.name)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                    if !item.desc.isEmpty {
-                        Text(item.desc)
-                            .font(.caption).foregroundStyle(.white.opacity(0.5)).lineLimit(2)
-                    }
-                    HStack {
-                        Text(dollars(Int((item.price * 100).rounded())))
-                            .font(.price(14.5)).foregroundStyle(.white)
-                        Spacer()
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
-                            .frame(width: 34, height: 34)
-                            .background(LinearGradient.brand)
-                            .clipShape(RoundedRectangle(cornerRadius: 2))
-                    }
-                    .padding(.top, 4)
+                        .font(.system(.body, design: .default).weight(.semibold))
+                        .foregroundStyle(Paper.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    DottedLeader()
+                    Text(dollars(Int((item.price * 100).rounded())))
+                        .font(.price(15)).foregroundStyle(Paper.ink)
+                }
+                if !item.desc.isEmpty {
+                    Text(item.desc).font(.footnote).foregroundStyle(Paper.inkSoft).lineLimit(2)
                 }
             }
-            .padding(12)
-            .background(Brand.warmCard)
-            .clipShape(RoundedRectangle(cornerRadius: Brand.r))
-            .overlay(RoundedRectangle(cornerRadius: Brand.r).strokeBorder(Brand.cardBrd, lineWidth: 1))
         }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 16).padding(.bottom, 10)
+        .padding(.horizontal, 20).padding(.vertical, 14)
+        .contentShape(Rectangle())
     }
 }

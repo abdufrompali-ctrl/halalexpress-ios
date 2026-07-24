@@ -1,8 +1,12 @@
 name: Build iOS app
 
+# Every push to main BUILDS (a smoke check), but nothing is PUBLISHED to users
+# unless the run is a version tag (v*) or a manual dispatch. Cut a release with:
+#   git tag v1.5.0 && git push origin v1.5.0
 on:
   push:
     branches: [main]
+    tags: ['v*']
     paths-ignore:
       - 'source.json'   # avoid a loop when CI commits the catalog back
       - 'README.md'
@@ -56,6 +60,7 @@ jobs:
           echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -65,6 +70,7 @@ jobs:
             --target "${{ github.sha }}"
 
       - name: Regenerate SideStore source catalog
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         env:
           REPO: ${{ github.repository }}
           V:    ${{ steps.meta.outputs.version }}
@@ -110,6 +116,7 @@ jobs:
           python3 -c "import json;json.load(open('source.json'));print('source.json valid')"
 
       - name: Commit updated catalog
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -117,7 +124,15 @@ jobs:
           git commit -m "chore: publish v${{ steps.meta.outputs.version }} build ${{ steps.meta.outputs.build }} to source [skip ci]" || exit 0
           git push
 
+      # NOTE (#15): host-key verification is disabled and the target is a private
+      # 10.0.0.1 address unreachable from the GitHub-hosted runner — this step will
+      # fail unless run from a self-hosted runner on the VPS network. Pin a known_hosts
+      # entry (VPS_KNOWN_HOSTS secret) and use a reachable host before relying on it.
+      # Marked non-fatal + gated so a failing deploy can't fail a run that already
+      # published the release/catalog; deploy source.json manually until fixed.
       - name: Deploy source.json to VPS
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        continue-on-error: true
         env:
           VPS_DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
         run: |

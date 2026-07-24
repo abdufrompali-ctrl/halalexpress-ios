@@ -63,7 +63,7 @@ struct OrderView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
-            BoardHeader(title: "MENU") { StatusStamp(open: hours?.orderingOpen == true) }
+            BoardHeader(title: "MENU") { StatusStamp(open: hours?.orderingOpen) }
             Group {
                 if let loc = hours?.location {
                     Text([loc.address, loc.city].compactMap { $0 }.joined(separator: " · "))
@@ -167,7 +167,7 @@ private struct FeaturedDish: View {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .topLeading) {
                     MenuItemImage(item: item).frame(height: 190).frame(maxWidth: .infinity)
-                    Text("MOST POPULAR")
+                    Text("FEATURED")
                         .font(.system(.caption, design: .default).weight(.heavy)).tracking(1)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10).padding(.vertical, 5)

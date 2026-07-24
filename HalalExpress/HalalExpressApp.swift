@@ -27,6 +27,7 @@ struct HalalExpressApp: App {
                 OnboardingView(onDone: { showOnboarding = false })
             }
             .task { await openingSequence() }   // once per launch, not on every foreground
+            .task { APIClient.shared.prefetchConfig() }   // warm payment config before first checkout
         }
     }
 

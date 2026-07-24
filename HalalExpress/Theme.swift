@@ -12,7 +12,7 @@ enum Paper {
     static let panelDim = Color(hex: 0xE4D9C6)   // pressed / disabled fill
     static let ink      = Color(hex: 0x17130F)   // primary text — warm near-black
     static let inkSoft  = Color(hex: 0x5B5249)   // secondary text
-    static let inkFaint = Color(hex: 0x93887A)   // tertiary / hints
+    static let inkFaint = Color(hex: 0x736758)   // tertiary / hints (darkened for legible contrast)
     static let line     = Color(hex: 0xD5C9B6)   // hairline rules & borders
     static let lineBold = Color(hex: 0x17130F)   // heavy rule (board headers)
     static let red      = Color(hex: 0xC81E1E)   // the one accent
@@ -52,9 +52,19 @@ extension Font {
     }
 
     /// Tabular figures for prices & totals — receipt authenticity, and they line up
-    /// in a column. Proportional letters, monospaced digits.
+    /// in a column. Proportional letters, monospaced digits. Anchored to Dynamic Type
+    /// text styles (by the passed size) so money scales with the user's text setting.
     static func price(_ size: CGFloat) -> Font {
-        .system(size: size, weight: .semibold).monospacedDigit()
+        let style: Font.TextStyle
+        switch size {
+        case ..<12:  style = .caption2
+        case ..<13:  style = .caption
+        case ..<15:  style = .footnote
+        case ..<16:  style = .subheadline
+        case ..<18:  style = .callout
+        default:     style = .body
+        }
+        return .system(style, design: .default).weight(.semibold).monospacedDigit()
     }
 }
 
@@ -226,14 +236,22 @@ extension View {
 // The green/red "OPEN"/"CLOSED" mark, set like an inked rubber stamp.
 
 struct StatusStamp: View {
-    let open: Bool
+    /// nil = hours not yet loaded or the fetch failed — never render this as "CLOSED".
+    let open: Bool?
     var body: some View {
-        HStack(spacing: 6) {
-            Circle().fill(open ? Paper.open : Paper.red).frame(width: 7, height: 7)
-            Text(open ? "OPEN" : "CLOSED")
+        let (color, label): (Color, String) = {
+            switch open {
+            case .some(true):  return (Paper.open, "OPEN")
+            case .some(false): return (Paper.red, "CLOSED")
+            case .none:        return (Paper.inkFaint, "HOURS N/A")
+            }
+        }()
+        return HStack(spacing: 6) {
+            Circle().fill(color).frame(width: 7, height: 7)
+            Text(label)
                 .font(.system(.caption, design: .default).weight(.heavy))
                 .tracking(1)
-                .foregroundStyle(open ? Paper.open : Paper.red)
+                .foregroundStyle(color)
         }
     }
 }

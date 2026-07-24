@@ -3,11 +3,21 @@ options:
   bundleIdPrefix: com.halalexpress
   deploymentTarget:
     iOS: "17.0"
+# To enable real in-app card payments, add the Square In-App Payments SDK and
+# uncomment its dependency on the target below, then run `xcodegen generate`.
+# The `#if canImport(SquareInAppPaymentsSDK)` block in PaymentService.swift goes
+# live automatically once the module resolves. (See PaymentService.swift header.)
+# packages:
+#   SquareInAppPaymentsSDK:
+#     url: https://github.com/square/in-app-payments-ios
+#     from: 1.6.2
 targets:
   HalalExpress:
     type: application
     platform: iOS
     sources: [HalalExpress]
+    # dependencies:
+    #   - package: SquareInAppPaymentsSDK
     info:
       path: HalalExpress/Info.plist
       properties:
@@ -19,6 +29,7 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIAppFonts:
           - BebasNeue-Regular.ttf
+        ITSAppUsesNonExemptEncryption: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.halalexpress.app

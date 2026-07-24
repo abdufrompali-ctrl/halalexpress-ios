@@ -268,7 +268,7 @@ struct CheckoutView: View {
             Spacer(minLength: 0)
         }
         .background(Paper.bg.ignoresSafeArea())
-        .presentationDetents([.height(300)])
+        .presentationDetents([.medium])
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer(); Button("Done") { focused = false }.tint(Paper.red)
@@ -295,7 +295,13 @@ struct CheckoutView: View {
         // Honour the Settings default-tip once, on first load.
         if !tipPrefilled {
             tipPrefilled = true
-            if [10, 15, 20].contains(defaultTip) { selectedTip = .percent(defaultTip) }
+            if [10, 15, 20].contains(defaultTip) {
+                selectedTip = .percent(defaultTip)          // matches a tip tile
+            } else if defaultTip > 0 {
+                // 18% / 25% have no tile — honor them as a prefilled custom amount.
+                customTipCents = Int((Double(cart.subtotalCents) * Double(defaultTip) / 100).rounded())
+                selectedTip = .custom
+            }
         }
 
         hours = try? await APIClient.shared.hours()
@@ -309,7 +315,7 @@ struct CheckoutView: View {
         errorMessage = nil
         do {
             let config = try await APIClient.shared.config()
-            let payment: PaymentService = StubPaymentService(environment: config.environment ?? "production")
+            let payment = PaymentServiceFactory.make(config: config)
             let sourceId = try await payment.tokenizeCard()
 
             let req = CheckoutRequest(

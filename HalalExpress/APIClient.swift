@@ -18,14 +18,22 @@ final class APIClient {
     static let shared = APIClient()
     let baseURL = URL(string: "https://halalexpressnc.com")!
 
-    private let session = URLSession.shared
+    private let session: URLSession = {
+        let cfg = URLSessionConfiguration.default
+        cfg.timeoutIntervalForRequest = 20      // don't let "Placing order…" hang ~60s
+        cfg.timeoutIntervalForResource = 40
+        cfg.waitsForConnectivity = false
+        return URLSession(configuration: cfg)
+    }()
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
 
     func get<T: Decodable>(_ path: String, query: [URLQueryItem] = []) async throws -> T {
-        var comps = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+        guard var comps = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)
+        else { throw APIError.badResponse }
         if !query.isEmpty { comps.queryItems = query }
-        let (data, resp) = try await session.data(from: comps.url!)
+        guard let url = comps.url else { throw APIError.badResponse }
+        let (data, resp) = try await session.data(from: url)
         return try handle(data: data, response: resp)
     }
 
@@ -56,7 +64,18 @@ final class APIClient {
     func catalog() async throws -> Catalog { try await get("api/catalog") }
     func hours() async throws -> HoursStatus { try await get("api/hours") }
     func scheduleSlots() async throws -> ScheduleResponse { try await get("api/schedule-slots") }
-    func config() async throws -> ServerConfig { try await get("api/config") }
+
+    // Payment config rarely changes; cache it so checkout never blocks on a live
+    // round-trip (and so a slow /api/config can't fail an otherwise-valid order).
+    private var cachedConfig: ServerConfig?
+    func config() async throws -> ServerConfig {
+        if let cachedConfig { return cachedConfig }
+        let cfg: ServerConfig = try await get("api/config")
+        cachedConfig = cfg
+        return cfg
+    }
+    /// Warm the config cache at launch so it's ready before the first checkout.
+    func prefetchConfig() { Task { _ = try? await config() } }
 
     func checkout(_ request: CheckoutRequest) async throws -> CheckoutResponse {
         try await post("api/checkout", body: request)

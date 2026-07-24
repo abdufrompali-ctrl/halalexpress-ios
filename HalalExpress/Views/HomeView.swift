@@ -75,7 +75,7 @@ struct HomeView: View {
     private var statusBlock: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                StatusStamp(open: isOpen)
+                StatusStamp(open: hours?.orderingOpen)
                 Spacer()
             }
             .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 12)
@@ -124,7 +124,7 @@ struct HomeView: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 18).padding(.vertical, 16)
             .frame(maxWidth: .infinity)
-            .background(Paper.red, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Paper.red, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(PressableStyle())
     }

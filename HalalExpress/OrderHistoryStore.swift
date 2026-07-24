@@ -46,8 +46,11 @@ final class OrderHistoryStore: ObservableObject {
 
     init() { load() }
 
+    private let maxHistory = 50
+
     func add(_ record: OrderRecord) {
         orders.insert(record, at: 0)   // newest first
+        if orders.count > maxHistory { orders = Array(orders.prefix(maxHistory)) }
         save()
     }
 

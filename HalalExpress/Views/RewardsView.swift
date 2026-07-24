@@ -64,7 +64,7 @@ struct RewardsView: View {
                 savedPhone = ""; savedName = ""; savedEmail = ""
             }
             .font(.subheadline).foregroundStyle(Paper.inkFaint)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 44)
         }
     }
 
